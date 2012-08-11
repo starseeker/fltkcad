@@ -41,13 +41,6 @@
 #include <FL/Fl_Text_Buffer.H>
 #include <FL/Fl_Text_Editor.H>
 
-#define WIDTH 700
-#define HEIGHT 600
-#define MENUBAR_HEIGHT 60
-#define TREE_WIDTH 160 
-#define PANEL_WIDTH 160 
-#define CONSOLE_HEIGHT 100 
-
 
 static const char *x_xpm[] = {                       // this is a .xpm file
 "14 14 2 1",
@@ -202,20 +195,32 @@ void PopulateTree(Fl_Tree& tree) {
 
 int main(int argc, char **argv) {
 
-  Fl_Window window(WIDTH, HEIGHT);
-    Fl_Group *menugrp = new Fl_Group(0, 0, WIDTH, MENUBAR_HEIGHT/2);           
-      Fl_Box *menu_resize_limit = new Fl_Box(FL_NO_BOX, MENUBAR_HEIGHT/2, 0, MENUBAR_HEIGHT/2, 100, 0);
-      Fl_Menu_Bar *mbar = new Fl_Menu_Bar(0,0,WIDTH-50, MENUBAR_HEIGHT/2); 
+  int window_default_width = 800;
+  int window_default_height = 700;
+
+  int menu_height = fl_height(FL_HELVETICA, 14) + 10;
+  fl_font(FL_HELVETICA, 14);
+
+  int tree_width = (int)(menu_height * 6);
+  int panel_width = (int)(menu_height * 6);
+  int help_width = (int)(fl_width("Help") * 1.8);
+
+  int console_height = (int)(menu_height * 5);
+  
+  Fl_Window window(window_default_width, window_default_height);
+    Fl_Group *menugrp = new Fl_Group(0, 0, window_default_width, menu_height);           
+      Fl_Box *menu_resize_limit = new Fl_Box(FL_NO_BOX, menu_height, 0, menu_height, 100, 0);
+      Fl_Menu_Bar *mbar = new Fl_Menu_Bar(0,0,window_default_width-help_width, menu_height); 
       mbar->menu(menuitems);
-      Fl_Menu_Bar *hbar = new Fl_Menu_Bar(WIDTH-50,0,WIDTH, MENUBAR_HEIGHT/2); 
+      Fl_Menu_Bar *hbar = new Fl_Menu_Bar(window_default_width-help_width,0,window_default_width, menu_height); 
       hbar->menu(helpitems);
       menugrp->resizable(menu_resize_limit);
     menugrp->end();
 
-    Fl_Group *buttongrp = new Fl_Group(0, MENUBAR_HEIGHT/2, WIDTH, MENUBAR_HEIGHT/2);           
-      Fl_Box *button_resize_limit = new Fl_Box(FL_NO_BOX, MENUBAR_HEIGHT, 0, MENUBAR_HEIGHT, 100, 0);
-      Fl_Box *button_container = new Fl_Box(FL_FRAME_BOX, 0, MENUBAR_HEIGHT/2, WIDTH, MENUBAR_HEIGHT/2, 0);
-      Fl_Button b1(5, MENUBAR_HEIGHT/2 + 1, MENUBAR_HEIGHT/2 -2, MENUBAR_HEIGHT/2 - 2);
+    Fl_Group *buttongrp = new Fl_Group(0, menu_height, window_default_width, menu_height);           
+      Fl_Box *button_resize_limit = new Fl_Box(FL_NO_BOX, menu_height*2, 0, menu_height*2, 100, 0);
+      Fl_Box *button_container = new Fl_Box(FL_FRAME_BOX, 0, menu_height, window_default_width, menu_height, 0);
+      Fl_Button b1(5, menu_height + 1, menu_height -2, menu_height - 2);
       Fl_Pixmap x(x_xpm);
       b1.image(x);
       b1.align(FL_ALIGN_INSIDE|FL_ALIGN_CENTER); 
@@ -223,19 +228,19 @@ int main(int argc, char **argv) {
     buttongrp->end();
 
 
-    ResizeAllTile tile(0, MENUBAR_HEIGHT ,WIDTH,HEIGHT - MENUBAR_HEIGHT);                        
+    ResizeAllTile tile(0, menu_height*2 ,window_default_width,window_default_height - menu_height*2);                        
 
-      MinSizeTree tree(0, MENUBAR_HEIGHT ,TREE_WIDTH,HEIGHT-MENUBAR_HEIGHT-CONSOLE_HEIGHT);
+      MinSizeTree tree(0, menu_height*2 ,tree_width,window_default_height-menu_height*2-console_height);
         PopulateTree(tree);
       tree.end();
       tile.tree = &tree;
 
-      MinSizeGroup panel_wrap(WIDTH - PANEL_WIDTH,MENUBAR_HEIGHT,PANEL_WIDTH,HEIGHT-MENUBAR_HEIGHT-CONSOLE_HEIGHT);
-      Fl_Group panel(WIDTH - PANEL_WIDTH,MENUBAR_HEIGHT,WIDTH,HEIGHT-MENUBAR_HEIGHT-CONSOLE_HEIGHT);
+      MinSizeGroup panel_wrap(window_default_width - panel_width,menu_height*2,panel_width,window_default_height-menu_height*2-console_height);
+      Fl_Group panel(window_default_width - panel_width,menu_height*2,window_default_width,window_default_height-menu_height*2-console_height);
         panel.box(FL_DOWN_BOX);
         panel.color(FL_WHITE);
 
-        Fl_Choice *opbox = new Fl_Choice(WIDTH-PANEL_WIDTH+3,MENUBAR_HEIGHT+20,PANEL_WIDTH-3,23, "Operation:");
+        Fl_Choice *opbox = new Fl_Choice(window_default_width -panel_width+3,menu_height*2+20,panel_width-3,23, "Operation:");
         opbox->down_box(FL_BORDER_BOX);
         opbox->align(Fl_Align(FL_ALIGN_TOP_LEFT));
         opbox->menu(opbox_menu);
@@ -244,20 +249,20 @@ int main(int argc, char **argv) {
       panel_wrap.end();
       tile.utility = &panel_wrap; 
 
-      MinSizeGroup view_wrap(TREE_WIDTH,MENUBAR_HEIGHT,WIDTH-TREE_WIDTH-PANEL_WIDTH,HEIGHT-MENUBAR_HEIGHT-CONSOLE_HEIGHT);
-      Fl_Group viewer(TREE_WIDTH,MENUBAR_HEIGHT,WIDTH-TREE_WIDTH-PANEL_WIDTH,HEIGHT-MENUBAR_HEIGHT-CONSOLE_HEIGHT);
+      MinSizeGroup view_wrap(tree_width,menu_height*2,window_default_width-tree_width-panel_width,window_default_height-menu_height*2-console_height);
+      Fl_Group viewer(tree_width,menu_height*2,window_default_width-tree_width-panel_width,window_default_height-menu_height*2-console_height);
         viewer.box(FL_DOWN_BOX);
         viewer.color(FL_GRAY);
       viewer.end();
       view_wrap.end();
       tile.viewer = &view_wrap;
 
-      MinSizeGroup console_wrap(0,HEIGHT - CONSOLE_HEIGHT,WIDTH,CONSOLE_HEIGHT, 0);
-      Fl_Group console(0,HEIGHT - CONSOLE_HEIGHT,WIDTH,CONSOLE_HEIGHT, 0);
+      MinSizeGroup console_wrap(0,window_default_height - console_height,window_default_width,console_height, 0);
+      Fl_Group console(0,window_default_height - console_height,window_default_width,console_height, 0);
         console.box(FL_DOWN_BOX);
         console.color(FL_GRAY);
         Fl_Text_Buffer *textbuf = new Fl_Text_Buffer(20);
-        Fl_Text_Editor *editor = new Fl_Text_Editor(0,HEIGHT - CONSOLE_HEIGHT,WIDTH,CONSOLE_HEIGHT);
+        Fl_Text_Editor *editor = new Fl_Text_Editor(0,window_default_height - console_height,window_default_width,console_height);
         editor->textfont(FL_COURIER); 
         editor->textsize(14);
         editor->buffer(textbuf);
@@ -265,7 +270,7 @@ int main(int argc, char **argv) {
       console.end();
       console_wrap.end();
       tile.command_prompt = &console_wrap;
-      //Fl_Box *tile_resize_limit = new Fl_Box(FL_NO_BOX, 5, 5, WIDTH-5, HEIGHT-5, 0);
+      //Fl_Box *tile_resize_limit = new Fl_Box(FL_NO_BOX, 5, 5, WIDTH-5, window_default_height-5, 0);
     tile.resizable(tile);
     tile.end();
   window.resizable(tile);
