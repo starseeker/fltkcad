@@ -100,13 +100,14 @@ class MinSizeTree: public Fl_Tree
    {  // Don't permit dimensions below a certain point.
       int width;
       int height;
-      if (W < 5) {
-        width = 5;
+      int limit = 2;
+      if (W < limit) {
+        width = limit;
       } else {
         width = W;
       }
-      if (H < 5) {
-        height = 5;
+      if (H < limit) {
+        height = limit;
       } else {
         height = H;
       }
