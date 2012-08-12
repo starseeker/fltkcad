@@ -40,7 +40,9 @@
 #include <FL/Fl_Button.H>
 #include <FL/Fl_Text_Buffer.H>
 #include <FL/Fl_Text_Editor.H>
-
+#include "FL/Fl_BGroup.H"
+#include "FL/Fl_GTree.H"
+#include "FL/Fl_BLayout.H"
 
 static const char *x_xpm[] = {                       // this is a .xpm file
 "14 14 2 1",
@@ -60,110 +62,6 @@ static const char *x_xpm[] = {                       // this is a .xpm file
 "  xxxxxxxxx   ",
 "    xxxxx     ",
 "              "};
-
-class MinSizeGroup: public Fl_Group
-{
-   public:
-
-   MinSizeGroup(int X, int Y, int W, int H,const char* L=""):Fl_Group(X,Y,W,H,L) {}
-
-   void resize(int X, int Y, int W, int H)
-   {  // Don't permit dimensions below a certain point.
-      int width; int height; if (W < 5) {
-        width = 5;
-      } else {
-        width = W;
-      }
-      if (H < 5) {
-        height = 5;
-      } else {
-        height = H;
-      }
-      Fl_Group::resize(X,Y,width,height);
-   }
-};
-
-class MinSizeTree: public Fl_Tree
-{
-   public:
-
-   MinSizeTree(int X, int Y, int W, int H,const char* L=""):Fl_Tree(X,Y,W,H,L) {}
-
-   void resize(int X, int Y, int W, int H)
-   {  // Don't permit dimensions below a certain point.
-      int width;
-      int height;
-      int limit = 2;
-      if (W < limit) {
-        width = limit;
-      } else {
-        width = W;
-      }
-      if (H < limit) {
-        height = limit;
-      } else {
-        height = H;
-      }
-      Fl_Tree::resize(X,Y,width,height);
-   }
-};
-
-
-// Because we're using a particular window structure in our custom tile, we
-// use some tricks to resize in a manner specific to our GUI layout.
-class ResizeAllTile: public Fl_Tile
-{
-   public:
-
-   ResizeAllTile(int X, int Y, int W, int H,const char* L=""):Fl_Tile(X,Y,W,H,L) {}
-   Fl_Widget *tree;
-   Fl_Widget *viewer;
-   Fl_Widget *utility;
-   Fl_Widget *command_prompt;
-
-   void resize(int X, int Y, int W, int H)
-   {  
-      //Fl_Group::resize(X,Y,W,H);
-      // If for some reason we couldn't ID one of the panels, just do
-      // the default resize
-      if (! tree || !viewer || !utility || !command_prompt) {
-         Fl_Group::resize(X,Y,W,H);
-         return;
-      }
-
-      // If the proposed width is smaller than the combined width of the 
-      // tree and the utility panel, fall back on default.
-      int new_width;
-      if (W < tree->w() + utility->w() + 15) {
-         Fl_Group::resize(X,Y,W,H);
-         return;
-      } 
-
-      // If the proposed height is smaller than the height of the 
-      // command prompt, fall back on default.
-      int new_height;
-      if (H < command_prompt->h() + 15) {
-         Fl_Group::resize(X,Y,W,H);
-         return;
-      }
-
-      // Find out what deltas we need to deal with
-      int dx = X-x();
-      int dy = Y-y();
-      int dw = W-w();
-      int dh = H-h();
-
-      // resize this (skip the Fl_Group resize):
-      Fl_Widget::resize(X,Y,W,H);
-
-      // Viewer takes resize
-      tree->resize(tree->x() + dx, tree->y() + dy, tree->w(), tree->h() + dh);
-      utility->resize(utility->x() + dx + dw, utility->y() + dy, utility->w(), utility->h() + dh);
-      command_prompt->resize(command_prompt->x() + dx, command_prompt->y() + dy + dh, command_prompt->w() + dw, command_prompt->h());
-      viewer->resize(viewer->x() + dx, viewer->y() + dy, viewer->w() + dw, viewer->h() + dh);
-   }
-};
-
 
 Fl_Menu_Item menuitems[] = {
   {"&File",0,0,0,FL_SUBMENU},
@@ -228,14 +126,14 @@ int main(int argc, char **argv) {
     buttongrp->end();
 
 
-    ResizeAllTile tile(0, menu_height*2 ,window_default_width,window_default_height - menu_height*2);                        
+    Fl_BLayout tile(0, menu_height*2 ,window_default_width,window_default_height - menu_height*2);                        
 
-      MinSizeTree tree(0, menu_height*2 ,tree_width,window_default_height-menu_height*2-console_height);
+      Fl_GTree tree(0, menu_height*2 ,tree_width,window_default_height-menu_height*2-console_height);
         PopulateTree(tree);
       tree.end();
       tile.tree = &tree;
 
-      MinSizeGroup panel_wrap(window_default_width - panel_width,menu_height*2,panel_width,window_default_height-menu_height*2-console_height);
+      Fl_BGroup panel_wrap(window_default_width - panel_width,menu_height*2,panel_width,window_default_height-menu_height*2-console_height);
       Fl_Group panel(window_default_width - panel_width,menu_height*2,window_default_width,window_default_height-menu_height*2-console_height);
         panel.box(FL_DOWN_BOX);
         panel.color(FL_WHITE);
@@ -249,7 +147,7 @@ int main(int argc, char **argv) {
       panel_wrap.end();
       tile.utility = &panel_wrap; 
 
-      MinSizeGroup view_wrap(tree_width,menu_height*2,window_default_width-tree_width-panel_width,window_default_height-menu_height*2-console_height);
+      Fl_BGroup view_wrap(tree_width,menu_height*2,window_default_width-tree_width-panel_width,window_default_height-menu_height*2-console_height);
       Fl_Group viewer(tree_width,menu_height*2,window_default_width-tree_width-panel_width,window_default_height-menu_height*2-console_height);
         viewer.box(FL_DOWN_BOX);
         viewer.color(FL_GRAY);
@@ -257,7 +155,7 @@ int main(int argc, char **argv) {
       view_wrap.end();
       tile.viewer = &view_wrap;
 
-      MinSizeGroup console_wrap(0,window_default_height - console_height,window_default_width,console_height, 0);
+      Fl_BGroup console_wrap(0,window_default_height - console_height,window_default_width,console_height, 0);
       Fl_Group console(0,window_default_height - console_height,window_default_width,console_height, 0);
         console.box(FL_DOWN_BOX);
         console.color(FL_GRAY);
