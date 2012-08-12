@@ -18,6 +18,8 @@
 #ifndef FL_BLAYOUT_H
 #define FL_BLAYOUT_H
 
+#include <FL/Fl_BGroup.H>
+#include <FL/Fl_GTree.H>
 #include <FL/Fl_Tile.H>
 
 class Fl_BLayout: public Fl_Tile
@@ -25,25 +27,25 @@ class Fl_BLayout: public Fl_Tile
    public:
 
    Fl_BLayout(int X, int Y, int W, int H,const char* L=""):Fl_Tile(X,Y,W,H,L) {}
-   Fl_Widget *tree;
-   Fl_Widget *viewer;
-   Fl_Widget *utility;
-   Fl_Widget *command_prompt;
+   Fl_GTree *tree;
+   Fl_BGroup *viewer_g;
+   Fl_BGroup *panel_g;
+   Fl_BGroup *console_g;
 
    void resize(int X, int Y, int W, int H)
    {  
       //Fl_Group::resize(X,Y,W,H);
-      // If for some reason we couldn't ID one of the panels, just do
+      // If for some reason we couldn't ID one of the panel_gs, just do
       // the default resize
-      if (! tree || !viewer || !utility || !command_prompt) {
+      if (! tree || !viewer_g || !panel_g || !console_g) {
          Fl_Group::resize(X,Y,W,H);
          return;
       }
 
       // If the proposed width is smaller than the combined width of the 
-      // tree and the utility panel, fall back on default.
+      // tree and the panel_g, fall back on default.
       int new_width;
-      if (W < tree->w() + utility->w() + 15) {
+      if (W < tree->w() + panel_g->w() + 15) {
          Fl_Group::resize(X,Y,W,H);
          return;
       } 
@@ -51,7 +53,7 @@ class Fl_BLayout: public Fl_Tile
       // If the proposed height is smaller than the height of the 
       // command prompt, fall back on default.
       int new_height;
-      if (H < command_prompt->h() + 15) {
+      if (H < console_g->h() + 15) {
          Fl_Group::resize(X,Y,W,H);
          return;
       }
@@ -67,9 +69,9 @@ class Fl_BLayout: public Fl_Tile
 
       // Viewer takes resize
       tree->resize(tree->x() + dx, tree->y() + dy, tree->w(), tree->h() + dh);
-      utility->resize(utility->x() + dx + dw, utility->y() + dy, utility->w(), utility->h() + dh);
-      command_prompt->resize(command_prompt->x() + dx, command_prompt->y() + dy + dh, command_prompt->w() + dw, command_prompt->h());
-      viewer->resize(viewer->x() + dx, viewer->y() + dy, viewer->w() + dw, viewer->h() + dh);
+      panel_g->resize(panel_g->x() + dx + dw, panel_g->y() + dy, panel_g->w(), panel_g->h() + dh);
+      console_g->resize(console_g->x() + dx, console_g->y() + dy + dh, console_g->w() + dw, console_g->h());
+      viewer_g->resize(viewer_g->x() + dx, viewer_g->y() + dy, viewer_g->w() + dw, viewer_g->h() + dh);
    }
 };
 

@@ -85,10 +85,10 @@ Fl_Menu_Item opbox_menu[] = {
   {0}
 };
 
-void PopulateTree(Fl_Tree& tree) {
-    tree.add("Aaa/Bbb/Ccc/Ddd/Eeeeeeeeeeee/Fff/0001");
-    tree.add("Aaa/Bbb/Ccc/Ddd/Eeeeeeeeeeee/Fff/0002");
-    tree.add("Aaa/Bbb/Ccc/Ddd/Eeeeeeeeeeee/Fff/0003");
+void PopulateTree(Fl_Tree *tree) {
+    tree->add("Aaa/Bbb/Ccc/Ddd/Eeeeeeeeeeee/Fff/0001");
+    tree->add("Aaa/Bbb/Ccc/Ddd/Eeeeeeeeeeee/Fff/0002");
+    tree->add("Aaa/Bbb/Ccc/Ddd/Eeeeeeeeeeee/Fff/0003");
 }
 
 int main(int argc, char **argv) {
@@ -126,36 +126,35 @@ int main(int argc, char **argv) {
     buttongrp->end();
 
 
-    Fl_BLayout tile(0, menu_height*2 ,window_default_width,window_default_height - menu_height*2);                        
+    Fl_BLayout layout_manager(0, menu_height*2 ,window_default_width,window_default_height - menu_height*2);             layout_manager.tree = new Fl_GTree(0, menu_height*2 ,tree_width,window_default_height-menu_height*2-console_height);
+      layout_manager.tree->begin();
+        PopulateTree(layout_manager.tree);
+      layout_manager.tree->end();
 
-      Fl_GTree tree(0, menu_height*2 ,tree_width,window_default_height-menu_height*2-console_height);
-        PopulateTree(tree);
-      tree.end();
-      tile.tree = &tree;
+      layout_manager.panel_g = new Fl_BGroup(window_default_width - panel_width,menu_height*2,panel_width,window_default_height-menu_height*2-console_height);
+      layout_manager.panel_g->begin();
+        Fl_Group p_panel(window_default_width - panel_width,menu_height*2,window_default_width,window_default_height-menu_height*2-console_height);
+          p_panel.box(FL_DOWN_BOX);
+          p_panel.color(FL_GRAY);
 
-      Fl_BGroup panel_wrap(window_default_width - panel_width,menu_height*2,panel_width,window_default_height-menu_height*2-console_height);
-      Fl_Group panel(window_default_width - panel_width,menu_height*2,window_default_width,window_default_height-menu_height*2-console_height);
-        panel.box(FL_DOWN_BOX);
-        panel.color(FL_WHITE);
+          Fl_Choice *opbox = new Fl_Choice(window_default_width -panel_width+3,menu_height*2+20,panel_width-3,23, "Operation:");
+          opbox->down_box(FL_BORDER_BOX);
+          opbox->align(Fl_Align(FL_ALIGN_TOP_LEFT));
+          opbox->menu(opbox_menu);
 
-        Fl_Choice *opbox = new Fl_Choice(window_default_width -panel_width+3,menu_height*2+20,panel_width-3,23, "Operation:");
-        opbox->down_box(FL_BORDER_BOX);
-        opbox->align(Fl_Align(FL_ALIGN_TOP_LEFT));
-        opbox->menu(opbox_menu);
+        p_panel.end();
+      layout_manager.panel_g->end();
 
-      panel.end();
-      panel_wrap.end();
-      tile.utility = &panel_wrap; 
+      layout_manager.viewer_g = new Fl_BGroup(tree_width,menu_height*2,window_default_width-tree_width-panel_width,window_default_height-menu_height*2-console_height);
+      layout_manager.viewer_g->begin();
+        Fl_Group v_box(tree_width,menu_height*2,window_default_width-tree_width-panel_width,window_default_height-menu_height*2-console_height);
+          v_box.box(FL_DOWN_BOX);
+          v_box.color(FL_BLACK);
+        v_box.end();
+      layout_manager.viewer_g->end();
 
-      Fl_BGroup view_wrap(tree_width,menu_height*2,window_default_width-tree_width-panel_width,window_default_height-menu_height*2-console_height);
-      Fl_Group viewer(tree_width,menu_height*2,window_default_width-tree_width-panel_width,window_default_height-menu_height*2-console_height);
-        viewer.box(FL_DOWN_BOX);
-        viewer.color(FL_GRAY);
-      viewer.end();
-      view_wrap.end();
-      tile.viewer = &view_wrap;
-
-      Fl_BGroup console_wrap(0,window_default_height - console_height,window_default_width,console_height, 0);
+      layout_manager.console_g = new Fl_BGroup(0,window_default_height - console_height,window_default_width,console_height, 0);
+      layout_manager.console_g->begin();
       Fl_Group console(0,window_default_height - console_height,window_default_width,console_height, 0);
         console.box(FL_DOWN_BOX);
         console.color(FL_GRAY);
@@ -166,12 +165,11 @@ int main(int argc, char **argv) {
         editor->buffer(textbuf);
         console.resizable(editor);
       console.end();
-      console_wrap.end();
-      tile.command_prompt = &console_wrap;
-      //Fl_Box *tile_resize_limit = new Fl_Box(FL_NO_BOX, 5, 5, WIDTH-5, window_default_height-5, 0);
-    tile.resizable(tile);
-    tile.end();
-  window.resizable(tile);
+      layout_manager.console_g->end();
+      //Fl_Box *layout_manager_resize_limit = new Fl_Box(FL_NO_BOX, 5, 5, WIDTH-5, window_default_height-5, 0);
+    layout_manager.resizable(layout_manager);
+    layout_manager.end();
+  window.resizable(layout_manager);
   window.end();
   window.size_range(300,300);
   window.show(argc, argv);
