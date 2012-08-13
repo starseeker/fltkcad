@@ -105,7 +105,7 @@ int main(int argc, char **argv) {
 
   int console_height = (int)(menu_height * 5);
   
-  Fl_Window window(window_default_width, window_default_height);
+  Fl_Window window(window_default_width, window_default_height, "BRL-CAD");
     Fl_Group *menugrp = new Fl_Group(0, 0, window_default_width, menu_height);           
       Fl_Box *menu_resize_limit = new Fl_Box(FL_NO_BOX, menu_height, 0, menu_height, 100, 0);
       Fl_Menu_Bar *mbar = new Fl_Menu_Bar(0,0,window_default_width-help_width, menu_height); 
@@ -134,7 +134,7 @@ int main(int argc, char **argv) {
       layout_manager.panel_g = new Fl_BGroup(window_default_width - panel_width,menu_height*2,panel_width,window_default_height-menu_height*2-console_height);
       layout_manager.panel_g->begin();
         Fl_Group p_panel(window_default_width - panel_width,menu_height*2,window_default_width,window_default_height-menu_height*2-console_height);
-          p_panel.box(FL_DOWN_BOX);
+          p_panel.box(FL_FLAT_BOX);
           p_panel.color(FL_GRAY);
 
           Fl_Choice *opbox = new Fl_Choice(window_default_width -panel_width+3,menu_height*2+20,panel_width-3,23, "Operation:");
@@ -149,7 +149,7 @@ int main(int argc, char **argv) {
       layout_manager.viewer_g->begin();
         Fl_Group v_box(tree_width,menu_height*2,window_default_width-tree_width-panel_width,window_default_height-menu_height*2-console_height);
           v_box.box(FL_DOWN_BOX);
-          v_box.color(FL_BLACK);
+          v_box.color(fl_rgb_color(0,0,50));
         v_box.end();
       layout_manager.viewer_g->end();
 
