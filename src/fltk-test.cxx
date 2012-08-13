@@ -85,12 +85,6 @@ Fl_Menu_Item opbox_menu[] = {
   {0}
 };
 
-void PopulateTree(Fl_Tree *tree) {
-    tree->add("Aaa/Bbb/Ccc/Ddd/Eeeeeeeeeeee/Fff/0001");
-    tree->add("Aaa/Bbb/Ccc/Ddd/Eeeeeeeeeeee/Fff/0002");
-    tree->add("Aaa/Bbb/Ccc/Ddd/Eeeeeeeeeeee/Fff/0003");
-}
-
 int main(int argc, char **argv) {
 
   int window_default_width = 800;
@@ -128,7 +122,9 @@ int main(int argc, char **argv) {
 
     Fl_BLayout layout_manager(0, menu_height*2 ,window_default_width,window_default_height - menu_height*2);             layout_manager.tree = new Fl_GTree(0, menu_height*2 ,tree_width,window_default_height-menu_height*2-console_height);
       layout_manager.tree->begin();
-        PopulateTree(layout_manager.tree);
+        layout_manager.tree->add("Aaa/Bbb/Ccc/Ddd/Eeeeeeeeeeee/Fff/0001"); 
+        layout_manager.tree->add("Aaa/Bbb/Ccc/Ddd/Eeeeeeeeeeee/Fff/0002");
+        layout_manager.tree->add("Aaa/Bbb/Ccc/Ddd/Eeeeeeeeeeee/Fff/0003");
       layout_manager.tree->end();
 
       layout_manager.panel_g = new Fl_BGroup(window_default_width - panel_width,menu_height*2,panel_width,window_default_height-menu_height*2-console_height);
@@ -143,6 +139,7 @@ int main(int argc, char **argv) {
           opbox->menu(opbox_menu);
 
         p_panel.end();
+	p_panel.resizable(NULL);
       layout_manager.panel_g->end();
 
       layout_manager.viewer_g = new Fl_BGroup(tree_width,menu_height*2,window_default_width-tree_width-panel_width,window_default_height-menu_height*2-console_height);
