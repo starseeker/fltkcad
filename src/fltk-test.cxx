@@ -78,7 +78,7 @@ int main(int argc, char **argv) {
   int window_default_height = 700;
 
   int menu_height = fl_height(FL_HELVETICA, 14) + 10;
-  int buttonbar_height = img->h() + 6;
+  int buttonbar_height = img->h() + 8;
   fl_font(FL_HELVETICA, 14);
 
   int tree_width = (int)(menu_height * 6);
@@ -101,7 +101,7 @@ int main(int argc, char **argv) {
     Fl_Group *buttongrp = new Fl_Group(0, menu_height, window_default_width, menu_height);           
       Fl_Box *button_resize_limit = new Fl_Box(FL_NO_BOX, menu_height+buttonbar_height, 0, menu_height+buttonbar_height, 100, 0);
       Fl_Box *button_container = new Fl_Box(FL_FRAME_BOX, 0, menu_height, window_default_width, buttonbar_height, 0);
-      Fl_Button b1(5, menu_height + 1, buttonbar_height-2, buttonbar_height - 2);
+      Fl_Button b1(5, menu_height + 1, buttonbar_height-2, buttonbar_height-2);
       b1.image(img);
       b1.align(FL_ALIGN_INSIDE|FL_ALIGN_CENTER); 
       buttongrp->resizable(button_resize_limit);
