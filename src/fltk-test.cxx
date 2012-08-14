@@ -108,16 +108,16 @@ int main(int argc, char **argv) {
     buttongrp->end();
 
 
-    Fl_BLayout layout_manager(0, menu_height+buttonbar_height ,window_default_width,window_default_height - menu_height+buttonbar_height);             layout_manager.tree = new Fl_GTree(0, menu_height+buttonbar_height ,tree_width,window_default_height-menu_height+buttonbar_height-console_height);
+    Fl_BLayout layout_manager(0, menu_height+buttonbar_height ,window_default_width,window_default_height-(menu_height+buttonbar_height));             layout_manager.tree = new Fl_GTree(0, menu_height+buttonbar_height ,tree_width,window_default_height-(menu_height+buttonbar_height)-console_height);
       layout_manager.tree->begin();
         layout_manager.tree->add("Aaa/Bbb/Ccc/Ddd/Eeeeeeeeeeee/Fff/0001"); 
         layout_manager.tree->add("Aaa/Bbb/Ccc/Ddd/Eeeeeeeeeeee/Fff/0002");
         layout_manager.tree->add("Aaa/Bbb/Ccc/Ddd/Eeeeeeeeeeee/Fff/0003");
       layout_manager.tree->end();
 
-      layout_manager.panel_g = new Fl_BGroup(window_default_width - panel_width,menu_height+buttonbar_height,panel_width,window_default_height-menu_height+buttonbar_height-console_height);
+      layout_manager.panel_g = new Fl_BGroup(window_default_width - panel_width,menu_height+buttonbar_height,panel_width,window_default_height-(menu_height+buttonbar_height)-console_height);
       layout_manager.panel_g->begin();
-        Fl_Group p_panel(window_default_width - panel_width,menu_height+buttonbar_height,window_default_width,window_default_height-menu_height+buttonbar_height-console_height);
+        Fl_Group p_panel(window_default_width - panel_width,menu_height+buttonbar_height,window_default_width,window_default_height-(menu_height+buttonbar_height)-console_height);
           p_panel.box(FL_FLAT_BOX);
           p_panel.color(FL_GRAY);
 
@@ -130,9 +130,9 @@ int main(int argc, char **argv) {
 	p_panel.resizable(NULL);
       layout_manager.panel_g->end();
 
-      layout_manager.viewer_g = new Fl_BGroup(tree_width,menu_height+buttonbar_height,window_default_width-tree_width-panel_width,window_default_height-menu_height+buttonbar_height-console_height);
+      layout_manager.viewer_g = new Fl_BGroup(tree_width,menu_height+buttonbar_height,window_default_width-tree_width-panel_width,window_default_height-(menu_height+buttonbar_height)-console_height);
       layout_manager.viewer_g->begin();
-        Fl_Group v_box(tree_width,menu_height+buttonbar_height,window_default_width-tree_width-panel_width,window_default_height-menu_height+buttonbar_height-console_height);
+        Fl_Group v_box(tree_width,menu_height+buttonbar_height,window_default_width-tree_width-panel_width,window_default_height-(menu_height+buttonbar_height)-console_height);
           v_box.box(FL_DOWN_BOX);
           v_box.color(fl_rgb_color(0,0,50));
         v_box.end();
