@@ -85,6 +85,8 @@ Fl_Menu_Item opbox_menu[] = {
   {0}
 };
 
+void quit_cb(Fl_Widget*, void*) {exit(0);}
+
 int main(int argc, char **argv) {
 
   int window_default_width = 800;
@@ -95,7 +97,7 @@ int main(int argc, char **argv) {
 
   int tree_width = (int)(menu_height * 6);
   int panel_width = (int)(menu_height * 6);
-  int help_width = (int)(fl_width("Help") * 1.8);
+  int help_width = (int)(fl_width("Help") + 16);
 
   int console_height = (int)(menu_height * 5);
   
@@ -104,6 +106,7 @@ int main(int argc, char **argv) {
       Fl_Box *menu_resize_limit = new Fl_Box(FL_NO_BOX, menu_height, 0, menu_height, 100, 0);
       Fl_Menu_Bar *mbar = new Fl_Menu_Bar(0,0,window_default_width-help_width, menu_height); 
       mbar->menu(menuitems);
+      mbar->add("File/&Quit", FL_ALT + 'q', quit_cb, 0, 0);
       Fl_Menu_Bar *hbar = new Fl_Menu_Bar(window_default_width-help_width,0,window_default_width, menu_height); 
       hbar->menu(helpitems);
       menugrp->resizable(menu_resize_limit);
