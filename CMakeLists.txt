@@ -5,20 +5,17 @@ IF(COMMAND CMAKE_POLICY)
 ENDIF(COMMAND CMAKE_POLICY)
 
 # Set CMake project name
-PROJECT(BCAD)
+PROJECT(FLTKCAD)
 
-# Identify CMake directory
-if(0)
-set(BCAD_CMAKE_DIR "${BCAD_SOURCE_DIR}/CMake")
-if(BCAD_IS_SUBBUILD)
-  set(CMAKE_MODULE_PATH "${CMAKE_MODULE_PATH};${BCAD_CMAKE_DIR}")
-else(BCAD_IS_SUBBUILD)
-  set(CMAKE_MODULE_PATH "${BCAD_CMAKE_DIR};${CMAKE_MODULE_PATH}")
-endif(BCAD_IS_SUBBUILD)
-endif(0)
-
+find_package(X11)
 find_package(OpenGL)
 find_package(FLTK 1.3)
+
+include(CheckLibraryExists)
+CHECK_LIBRARY_EXISTS(dl dlopen "" HAVE_DL_LIBRARY)
+if(HAVE_DL_LIBRARY)
+  set(DL_LIBRARY "dl")
+endif(HAVE_DL_LIBRARY)
 
 add_subdirectory(src)
 
