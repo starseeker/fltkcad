@@ -7,9 +7,12 @@ ENDIF(COMMAND CMAKE_POLICY)
 # Set CMake project name
 PROJECT(FLTKCAD)
 
+find_package(PNG)
 find_package(X11)
 find_package(OpenGL)
-find_package(FLTK 1.3)
+add_subdirectory(fltk)
+
+set(FLTK_LIBRARIES fltk fltk_images fltk_gl fltk_forms)
 
 include(CheckLibraryExists)
 CHECK_LIBRARY_EXISTS(dl dlopen "" HAVE_DL_LIBRARY)
