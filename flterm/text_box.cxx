@@ -10,7 +10,7 @@
 #include <FL/Fl_Box.H>
 #include <FL/Fl_Double_Window.H>
 #include <FL/Fl_Button.H>
-#include <Fl/fl_draw.H>
+#include <FL/fl_draw.H>
 //#include <FL/fl_ask.H>
 
 #include "gterm.hpp"

@@ -3,7 +3,7 @@
 
 #include <FL/Fl.H>
 #include <FL/Fl_Box.H>
-#include <Fl/fl_draw.H>
+#include <FL/fl_draw.H>
 #include <FL/fl_ask.H>
 
 #include "gterm.hpp"

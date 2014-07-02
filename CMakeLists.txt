@@ -11,6 +11,7 @@ find_package(PNG)
 find_package(X11)
 find_package(OpenGL)
 add_subdirectory(fltk)
+add_subdirectory(flterm)
 
 set(FLTK_LIBRARIES fltk fltk_images fltk_gl fltk_forms)
 
