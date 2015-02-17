@@ -14,12 +14,15 @@ add_subdirectory(fltk)
 add_subdirectory(flterm)
 
 set(FLTK_LIBRARIES fltk fltk_images fltk_gl fltk_forms)
+set(FLTK_FLUID_EXECUTABLE fluid)
 
 include(CheckLibraryExists)
 CHECK_LIBRARY_EXISTS(dl dlopen "" HAVE_DL_LIBRARY)
 if(HAVE_DL_LIBRARY)
   set(DL_LIBRARY "dl")
 endif(HAVE_DL_LIBRARY)
+
+#add_subdirectory(fltkconsole)
 
 add_subdirectory(src)
 
