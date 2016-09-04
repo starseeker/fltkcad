@@ -1,5 +1,5 @@
 //
-// "$Id: fl_shortcut.cxx 10076 2014-01-21 14:00:43Z AlbrechtS $"
+// "$Id: fl_shortcut.cxx 10250 2014-08-23 09:10:50Z cand $"
 //
 // Shortcut support routines for the Fast Light Tool Kit (FLTK).
 //
@@ -179,7 +179,7 @@ const char* fl_shortcut_label(unsigned int shortcut) {
   \see fl_shortcut_label(unsigned int shortcut)
   */
 const char* fl_shortcut_label(unsigned int shortcut, const char **eom) {
-  static char buf[20];
+  static char buf[40];
   char *p = buf;
   if (eom) *eom = p;
   if (!shortcut) {*p = 0; return buf;}
@@ -432,5 +432,5 @@ int Fl_Widget::test_shortcut() {
 }
 
 //
-// End of "$Id: fl_shortcut.cxx 10076 2014-01-21 14:00:43Z AlbrechtS $".
+// End of "$Id: fl_shortcut.cxx 10250 2014-08-23 09:10:50Z cand $".
 //

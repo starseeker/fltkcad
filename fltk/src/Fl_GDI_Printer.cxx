@@ -1,5 +1,5 @@
 //
-// "$Id: Fl_GDI_Printer.cxx 9917 2013-05-15 13:42:19Z manolo $"
+// "$Id: Fl_GDI_Printer.cxx 10391 2014-10-23 11:33:43Z AlbrechtS $"
 //
 // Support for WIN32 printing for the Fast Light Tool Kit (FLTK).
 //
@@ -160,7 +160,7 @@ void Fl_System_Printer::absolute_printable_rect(int *x, int *y, int *w, int *h)
 
 void Fl_System_Printer::margins(int *left, int *top, int *right, int *bottom)
 {
-  int x, y, w, h;
+  int x = 0, y = 0, w = 0, h = 0;
   absolute_printable_rect(&x, &y, &w, &h);
   if (left) *left = x;
   if (top) *top = y;
@@ -277,5 +277,5 @@ void Fl_System_Printer::untranslate (void)
 #endif // WIN32
 
 //
-// End of "$Id: Fl_GDI_Printer.cxx 9917 2013-05-15 13:42:19Z manolo $".
+// End of "$Id: Fl_GDI_Printer.cxx 10391 2014-10-23 11:33:43Z AlbrechtS $".
 //

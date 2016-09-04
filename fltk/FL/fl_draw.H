@@ -1,5 +1,5 @@
 //
-// "$Id: fl_draw.H 10196 2014-06-16 11:17:57Z ossman $"
+// "$Id: fl_draw.H 10320 2014-09-18 15:25:55Z greg.ercolano $"
 //
 // Portable drawing function header file for the Fast Light Tool Kit (FLTK).
 //
@@ -531,11 +531,14 @@ FL_EXPORT int fl_height(int font, int size);
   draw the text at so it looks centered vertically in that box.
 */
 inline int  fl_descent() {return fl_graphics_driver->descent();}
-/** Returns the typographical width of a nul-terminated string */
+/** Returns the typographical width of a nul-terminated string
+    using the current font face and size. */
 FL_EXPORT double fl_width(const char* txt);
-/** Returns the typographical width of a sequence of \p n characters */
+/** Returns the typographical width of a sequence of \p n characters
+    using the current font face and size. */
 inline double fl_width(const char* txt, int n) {return fl_graphics_driver->width(txt, n);}
-/** Returns the typographical width of a single character.
+/** Returns the typographical width of a single character
+    using the current font face and size.
     \note if a valid fl_gc is NOT found then it uses the first window gc,
     or the screen gc if no fltk window is available when called. */
 inline double fl_width(unsigned int c)  {return fl_graphics_driver->width(c);}
@@ -793,5 +796,5 @@ FL_EXPORT int fl_add_symbol(const char* name, void (*drawit)(Fl_Color), int scal
 #endif
 
 //
-// End of "$Id: fl_draw.H 10196 2014-06-16 11:17:57Z ossman $".
+// End of "$Id: fl_draw.H 10320 2014-09-18 15:25:55Z greg.ercolano $".
 //

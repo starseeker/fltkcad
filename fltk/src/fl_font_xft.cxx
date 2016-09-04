@@ -1,5 +1,5 @@
 //
-// "$Id: fl_font_xft.cxx 10177 2014-05-30 05:57:00Z manolo $"
+// "$Id: fl_font_xft.cxx 10232 2014-08-21 12:13:47Z cand $"
 //
 // Xft font code for the Fast Light Tool Kit (FLTK).
 //
@@ -101,8 +101,8 @@ Fl_Fontdesc* fl_fonts = built_in_table;
 
 Fl_XFont_On_Demand fl_xfont;
 void *fl_xftfont = 0;
-//const char* fl_encoding_ = "iso8859-1";
-const char* fl_encoding_ = "iso10646-1";
+//static const char* fl_encoding_ = "iso8859-1";
+static const char* fl_encoding_ = "iso10646-1";
 
 static void fl_xft_font(Fl_Xlib_Graphics_Driver *driver, Fl_Font fnum, Fl_Fontsize size, int angle) {
   if (fnum==-1) { // special case to stop font caching
@@ -693,5 +693,5 @@ void Fl_Xlib_Graphics_Driver::rtl_draw(const char* c, int n, int x, int y) {
 #endif
 
 //
-// End of "$Id: fl_font_xft.cxx 10177 2014-05-30 05:57:00Z manolo $"
+// End of "$Id: fl_font_xft.cxx 10232 2014-08-21 12:13:47Z cand $"
 //

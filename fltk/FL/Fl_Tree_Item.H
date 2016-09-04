@@ -1,5 +1,5 @@
 //
-// "$Id: Fl_Tree_Item.H 10157 2014-05-22 15:38:27Z greg.ercolano $"
+// "$Id: Fl_Tree_Item.H 10271 2014-09-04 18:56:52Z greg.ercolano $"
 //
 
 #ifndef FL_TREE_ITEM_H
@@ -271,6 +271,13 @@ public:
 #endif
   Fl_Tree_Item *insert(const Fl_Tree_Prefs &prefs, const char *new_label, int pos=0);
   Fl_Tree_Item *insert_above(const Fl_Tree_Prefs &prefs, const char *new_label);
+  Fl_Tree_Item* deparent(int index);
+  int reparent(Fl_Tree_Item *newchild, int index);
+  int move(int to, int from);
+  int move(Fl_Tree_Item *item, int op=0, int pos=0);
+  int move_above(Fl_Tree_Item *item);
+  int move_below(Fl_Tree_Item *item);
+  int move_into(Fl_Tree_Item *item, int pos=0);
   int depth() const;
   Fl_Tree_Item *prev();
   Fl_Tree_Item *next();
@@ -483,5 +490,5 @@ protected:
 #endif /*FL_TREE_ITEM_H*/
 
 //
-// End of "$Id: Fl_Tree_Item.H 10157 2014-05-22 15:38:27Z greg.ercolano $".
+// End of "$Id: Fl_Tree_Item.H 10271 2014-09-04 18:56:52Z greg.ercolano $".
 //

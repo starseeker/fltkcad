@@ -1,5 +1,5 @@
 //
-// "$Id: Fl_Table.cxx 10104 2014-02-16 08:36:34Z greg.ercolano $"
+// "$Id: Fl_Table.cxx 10225 2014-08-03 16:40:58Z greg.ercolano $"
 //
 // Fl_Table -- A table widget
 //
@@ -199,7 +199,7 @@ void Fl_Table::col_width(int col, int width)
   // Add column widths, even if none yet
   int now_size = (int)_colwidths.size();
   if ( col >= now_size ) {
-    _colwidths.size(col);
+    _colwidths.size(col+1);
     while (now_size < col) {
       _colwidths[now_size++] = width;
     }
@@ -1314,5 +1314,5 @@ void Fl_Table::draw() {
 }
 
 //
-// End of "$Id: Fl_Table.cxx 10104 2014-02-16 08:36:34Z greg.ercolano $".
+// End of "$Id: Fl_Table.cxx 10225 2014-08-03 16:40:58Z greg.ercolano $".
 //

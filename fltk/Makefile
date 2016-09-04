@@ -1,5 +1,5 @@
 #
-# "$Id: Makefile 9990 2013-09-24 09:10:04Z ossman $"
+# "$Id: Makefile 10224 2014-08-01 20:56:09Z greg.ercolano $"
 #
 # Top-level makefile for the Fast Light Tool Kit (FLTK).
 #
@@ -60,7 +60,7 @@ depend: makeinclude
 
 clean:
 	-$(RM) core *.o
-	for dir in $(DIRS); do\
+	for dir in examples $(DIRS); do\
 		echo "=== cleaning $$dir ===";\
 		(cd $$dir; $(MAKE) $(MFLAGS) clean) || exit 1;\
 	done
@@ -131,5 +131,5 @@ clang-changes:
 
 
 #
-# End of "$Id: Makefile 9990 2013-09-24 09:10:04Z ossman $".
+# End of "$Id: Makefile 10224 2014-08-01 20:56:09Z greg.ercolano $".
 #

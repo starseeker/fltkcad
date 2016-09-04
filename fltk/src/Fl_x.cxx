@@ -1,5 +1,5 @@
 //
-// "$Id: Fl_x.cxx 10197 2014-06-16 11:39:32Z ossman $"
+// "$Id: Fl_x.cxx 10412 2014-10-29 20:25:46Z cand $"
 //
 // X specific code for the Fast Light Tool Kit (FLTK).
 //
@@ -36,6 +36,7 @@
 #  include <FL/Fl_Paged_Device.H>
 #  include <FL/Fl_Shared_Image.H>
 #  include <FL/fl_ask.H>
+#  include <FL/filename.H>
 #  include <stdio.h>
 #  include <stdlib.h>
 #  include "flstring.h"
@@ -46,6 +47,7 @@
 #  include <X11/Xlocale.h>
 #  include <X11/Xlib.h>
 #  include <X11/keysym.h>
+#  include "Xutf8.h"
 #define USE_XRANDR (HAVE_DLSYM && HAVE_DLFCN_H) // means attempt to dynamically load libXrandr.so
 #if USE_XRANDR
 #include <dlfcn.h>
@@ -191,6 +193,8 @@ void Fl::remove_fd(int n) {
   remove_fd(n, -1);
 }
 
+extern int fl_send_system_handlers(void *e);
+
 #if CONSOLIDATE_MOTION
 static Fl_Window* send_motion;
 extern Fl_Window* fl_xmousewin;
@@ -201,6 +205,8 @@ static void do_queued_events() {
   while (XEventsQueued(fl_display,QueuedAfterReading)) {
     XEvent xevent;
     XNextEvent(fl_display, &xevent);
+    if (fl_send_system_handlers(&xevent))
+      continue;
     fl_handle(xevent);
   }
   // we send FL_LEAVE only if the mouse did not enter some other window:
@@ -310,9 +316,10 @@ Window fl_message_window = 0;
 int fl_screen;
 XVisualInfo *fl_visual;
 Colormap fl_colormap;
-XIM fl_xim_im = 0;
+static XIM fl_xim_im = 0;
 XIC fl_xim_ic = 0;
-char fl_is_over_the_spot = 0;
+static Window fl_xim_win = 0;
+static char fl_is_over_the_spot = 0;
 static XRectangle status_area;
 
 static Atom WM_DELETE_WINDOW;
@@ -335,24 +342,25 @@ Atom fl_XdndActionCopy;
 Atom fl_XdndFinished;
 //Atom fl_XdndProxy;
 Atom fl_XdndURIList;
-Atom fl_Xatextplainutf;
-Atom fl_Xatextplainutf2;		// STR#2930 
-Atom fl_Xatextplain;
+static Atom fl_Xatextplainutf;
+static Atom fl_Xatextplainutf2;		// STR#2930 
+static Atom fl_Xatextplain;
 static Atom fl_XaText;
-Atom fl_XaCompoundText;
+static Atom fl_XaCompoundText;
 Atom fl_XaUtf8String;
-Atom fl_XaTextUriList;
-Atom fl_XaImageBmp;
-Atom fl_XaImagePNG;
-Atom fl_INCR;
-Atom fl_NET_WM_NAME;			// utf8 aware window label
-Atom fl_NET_WM_ICON_NAME;		// utf8 aware window icon name
-Atom fl_NET_SUPPORTING_WM_CHECK;
-Atom fl_NET_WM_STATE;
-Atom fl_NET_WM_STATE_FULLSCREEN;
-Atom fl_NET_WM_FULLSCREEN_MONITORS;
-Atom fl_NET_WORKAREA;
-Atom fl_NET_WM_ICON;
+static Atom fl_XaTextUriList;
+static Atom fl_XaImageBmp;
+static Atom fl_XaImagePNG;
+static Atom fl_INCR;
+static Atom fl_NET_WM_NAME;			// utf8 aware window label
+static Atom fl_NET_WM_ICON_NAME;		// utf8 aware window icon name
+static Atom fl_NET_SUPPORTING_WM_CHECK;
+static Atom fl_NET_WM_STATE;
+static Atom fl_NET_WM_STATE_FULLSCREEN;
+static Atom fl_NET_WM_FULLSCREEN_MONITORS;
+static Atom fl_NET_WORKAREA;
+static Atom fl_NET_WM_ICON;
+static Atom fl_NET_ACTIVE_WINDOW;
 
 /*
   X defines 32-bit-entities to have a format value of max. 32,
@@ -384,14 +392,14 @@ extern "C" {
 
 extern char *fl_get_font_xfld(int fnum, int size);
 
-void fl_new_ic()
+static void fl_new_ic()
 {
   XVaNestedList preedit_attr = NULL;
   XVaNestedList status_attr = NULL;
   static XFontSet fs = NULL;
   char *fnt;
-  char **missing_list;
-  int missing_count;
+  char **missing_list = 0;
+  int missing_count = 0;
   char *def_string;
   static XRectangle spot;
   int predit = 0;
@@ -419,6 +427,9 @@ void fl_new_ic()
     if (must_free_fnt) free(fnt);
   }
 #endif
+
+  if (missing_list) XFreeStringList(missing_list);
+
   preedit_attr = XVaCreateNestedList(0,
                                      XNSpotLocation, &spot,
                                      XNFontSet, fs, NULL);
@@ -561,7 +572,7 @@ void fl_set_status(int x, int y, int w, int h)
   XFree(status_attr);
 }
 
-void fl_init_xim() {
+static void fl_init_xim() {
   static int xim_warning = 2;
   if (xim_warning > 0) xim_warning--;
 
@@ -604,6 +615,55 @@ void fl_init_xim() {
   }
   // if xim_styles is still allocated, free it now
   if(xim_styles) XFree(xim_styles);
+}
+
+void fl_xim_deactivate(void);
+
+void fl_xim_activate(Window xid) {
+  if (!fl_xim_im)
+    return;
+
+  // If the focused window has changed, then use the brute force method
+  // of completely recreating the input context.
+  if (fl_xim_win != xid) {
+    fl_xim_deactivate();
+
+    fl_new_ic();
+    fl_xim_win = xid;
+
+    XSetICValues(fl_xim_ic,
+                 XNFocusWindow, fl_xim_win,
+                 XNClientWindow, fl_xim_win,
+                 NULL);
+  }
+
+  fl_set_spot(spotf, spots, spot.x, spot.y, spot.width, spot.height);
+}
+
+void fl_xim_deactivate(void) {
+  if (!fl_xim_ic)
+    return;
+
+  XDestroyIC(fl_xim_ic);
+  fl_xim_ic = NULL;
+
+  fl_xim_win = 0;
+}
+
+void Fl::enable_im() {
+  Fl_Window *win;
+
+  win = Fl::first_window();
+  if (win && win->shown()) {
+    fl_xim_activate(fl_xid(win));
+    XSetICFocus(fl_xim_ic);
+  } else {
+    fl_new_ic();
+  }
+}
+
+void Fl::disable_im() {
+  fl_xim_deactivate();
 }
 
 void fl_open_display() {
@@ -664,6 +724,7 @@ void fl_open_display(Display* d) {
   fl_NET_WM_FULLSCREEN_MONITORS = XInternAtom(d, "_NET_WM_FULLSCREEN_MONITORS", 0);
   fl_NET_WORKAREA       = XInternAtom(d, "_NET_WORKAREA",       0);
   fl_NET_WM_ICON        = XInternAtom(d, "_NET_WM_ICON",        0);
+  fl_NET_ACTIVE_WINDOW  = XInternAtom(d, "_NET_ACTIVE_WINDOW",  0);
 
   if (sizeof(Atom) < 4)
     atom_bits = sizeof(Atom) * 8;
@@ -865,11 +926,11 @@ int Fl::clipboard_contains(const char *type)
   return retval;
 }
 
-Window fl_dnd_source_window;
-Atom *fl_dnd_source_types; // null-terminated list of data types being supplied
-Atom fl_dnd_type;
-Atom fl_dnd_source_action;
-Atom fl_dnd_action;
+static Window fl_dnd_source_window;
+static Atom *fl_dnd_source_types; // null-terminated list of data types being supplied
+static Atom fl_dnd_type;
+static Atom fl_dnd_source_action;
+static Atom fl_dnd_action;
 
 void fl_sendClientMessage(Window window, Atom message,
                                  unsigned long d0,
@@ -1244,16 +1305,22 @@ static long getIncrData(uchar* &data, const XSelectionEvent& selevent, long lowe
   return (long)total;
 }
 
+/* Internal function to reduce "deprecated" warnings for XKeycodeToKeysym().
+   This way we get only one warning. The option to use XkbKeycodeToKeysym()
+   instead would not help much - see STR #2913 for more information.
+*/
+static KeySym fl_KeycodeToKeysym(Display *d, KeyCode k, unsigned i) {
+  return XKeycodeToKeysym(d, k, i);
+}
 
 int fl_handle(const XEvent& thisevent)
 {
   XEvent xevent = thisevent;
   fl_xevent = &thisevent;
   Window xid = xevent.xany.window;
-  static Window xim_win = 0;
 
   if (fl_xim_ic && xevent.type == DestroyNotify &&
-        xid != xim_win && !fl_find(xid))
+        xid != fl_xim_win && !fl_find(xid))
   {
     XIM xim_im;
     xim_im = XOpenIM(fl_display, NULL, NULL, NULL);
@@ -1269,46 +1336,9 @@ int fl_handle(const XEvent& thisevent)
   }
 
   if (fl_xim_ic && (xevent.type == FocusIn))
-  {
-#define POOR_XIM
-#ifdef POOR_XIM
-        if (xim_win != xid)
-        {
-                xim_win  = xid;
-                XDestroyIC(fl_xim_ic);
-                fl_xim_ic = NULL;
-                fl_new_ic();
-                XSetICValues(fl_xim_ic,
-                                XNFocusWindow, xevent.xclient.window,
-                                XNClientWindow, xid,
-                                NULL);
-        }
-        fl_set_spot(spotf, spots, spot.x, spot.y, spot.width, spot.height);
-#else
-    if (Fl::first_window() && Fl::first_window()->modal()) {
-      Window x  = fl_xid(Fl::first_window());
-      if (x != xim_win) {
-        xim_win  = x;
-        XSetICValues(fl_xim_ic,
-                        XNFocusWindow, xim_win,
-                        XNClientWindow, xim_win,
-                        NULL);
-        fl_set_spot(spotf, spots, spot.x, spot.y, spot.width, spot.height);
-      }
-    } else if (xim_win != xid && xid) {
-      xim_win = xid;
-      XSetICValues(fl_xim_ic,
-                        XNFocusWindow, xevent.xclient.window,
-                        XNClientWindow, xid,
-                        //XNFocusWindow, xim_win,
-                        //XNClientWindow, xim_win,
-                        NULL);
-      fl_set_spot(spotf, spots, spot.x, spot.y, spot.width, spot.height);
-    }
-#endif
-  }
+    fl_xim_activate(xid);
 
-  if ( XFilterEvent((XEvent *)&xevent, 0) )
+  if (fl_xim_ic && XFilterEvent((XEvent *)&xevent, 0))
       return(1);
   
 #if USE_XRANDR  
@@ -1761,7 +1791,7 @@ fprintf(stderr,"\n");*/
 	  len = XUtf8LookupString(fl_xim_ic, (XKeyPressedEvent *)&xevent.xkey,
 			     kp_buffer, kp_buffer_len, &keysym, &status);
 	}
-	keysym = XKeycodeToKeysym(fl_display, keycode, 0);
+	keysym = fl_KeycodeToKeysym(fl_display, keycode, 0);
       } else {
         //static XComposeStatus compose;
         len = XLookupString((XKeyEvent*)&(xevent.xkey),
@@ -1773,12 +1803,9 @@ fprintf(stderr,"\n");*/
           if (len < 1) len = 1;
           // ignore all effects of shift on the keysyms, which makes it a lot
           // easier to program shortcuts and is Windoze-compatible:
-          keysym = XKeycodeToKeysym(fl_display, keycode, 0);
+          keysym = fl_KeycodeToKeysym(fl_display, keycode, 0);
         }
       }
-      // MRS: Can't use Fl::event_state(FL_CTRL) since the state is not
-      //      set until set_event_xy() is called later...
-      if ((xevent.xkey.state & ControlMask) && keysym == '-') kp_buffer[0] = 0x1f; // ^_
       kp_buffer[len] = 0;
       Fl::e_text = kp_buffer;
       Fl::e_length = len;
@@ -1819,7 +1846,7 @@ fprintf(stderr,"\n");*/
       event = FL_KEYUP;
       fl_key_vector[keycode/8] &= ~(1 << (keycode%8));
       // keyup events just get the unshifted keysym:
-      keysym = XKeycodeToKeysym(fl_display, keycode, 0);
+      keysym = fl_KeycodeToKeysym(fl_display, keycode, 0);
     }
 #  ifdef __sgi
     // You can plug a microsoft keyboard into an sgi but the extra shift
@@ -1912,7 +1939,7 @@ fprintf(stderr,"\n");*/
     if (keysym >= 0xff91 && keysym <= 0xff9f) {
       // Map keypad keysym to character or keysym depending on
       // numlock state...
-      unsigned long keysym1 = XKeycodeToKeysym(fl_display, keycode, 1);
+      unsigned long keysym1 = fl_KeycodeToKeysym(fl_display, keycode, 1);
       if (keysym1 <= 0x7f || (keysym1 > 0xff9f && keysym1 <= FL_KP_Last))
         Fl::e_original_keysym = (int)(keysym1 | FL_KP);
       if ((xevent.xkey.state & Mod2Mask) &&
@@ -2200,6 +2227,25 @@ int Fl_X::ewmh_supported() {
   }
 
   return result;
+}
+
+extern Fl_Window *fl_xfocus;
+
+void Fl_X::activate_window(Window w) {
+  if (!ewmh_supported())
+    return;
+
+  Window prev = 0;
+
+  if (fl_xfocus) {
+    Fl_X *x = Fl_X::i(fl_xfocus);
+    if (!x)
+      return;
+    prev = x->xid;
+  }
+
+  send_wm_event(w, fl_NET_ACTIVE_WINDOW, 1 /* application */,
+                0 /* timestamp */, prev /* previously active window */);
 }
 
 /* Change an existing window to fullscreen */
@@ -2509,6 +2555,9 @@ void Fl_X::make_xid(Fl_Window* win, XVisualInfo *visual, Colormap colormap)
   }
 #endif
 
+  if (win->shape_data_) {
+    win->combine_mask();
+    }
   XMapWindow(fl_display, xp->xid);
   if (showit) {
     win->set_visible();
@@ -2697,34 +2746,60 @@ void Fl_X::set_icons() {
 ////////////////////////////////////////////////////////////////
 
 int Fl_X::set_cursor(Fl_Cursor c) {
-  unsigned int shape;
+
+  /* The cursors are cached, because creating one takes 0.5ms including
+     opening, reading, and closing theme files. They are kept until program
+     exit by design, which valgrind will note as reachable. */
+  static Cursor xc_arrow = None;
+  static Cursor xc_cross = None;
+  static Cursor xc_wait = None;
+  static Cursor xc_insert = None;
+  static Cursor xc_hand = None;
+  static Cursor xc_help = None;
+  static Cursor xc_move = None;
+  static Cursor xc_ns = None;
+  static Cursor xc_we = None;
+  static Cursor xc_ne = None;
+  static Cursor xc_n = None;
+  static Cursor xc_nw = None;
+  static Cursor xc_e = None;
+  static Cursor xc_w = None;
+  static Cursor xc_se = None;
+  static Cursor xc_s = None;
+  static Cursor xc_sw = None;
+
   Cursor xc;
 
+#define cache_cursor(name, var) if (var == None) { \
+                                  var = XCreateFontCursor(fl_display, name); \
+                                } \
+                                xc = var
+
   switch (c) {
-  case FL_CURSOR_ARROW:   shape = XC_left_ptr; break;
-  case FL_CURSOR_CROSS:   shape = XC_tcross; break;
-  case FL_CURSOR_WAIT:    shape = XC_watch; break;
-  case FL_CURSOR_INSERT:  shape = XC_xterm; break;
-  case FL_CURSOR_HAND:    shape = XC_hand2; break;
-  case FL_CURSOR_HELP:    shape = XC_question_arrow; break;
-  case FL_CURSOR_MOVE:    shape = XC_fleur; break;
-  case FL_CURSOR_NS:      shape = XC_sb_v_double_arrow; break;
-  case FL_CURSOR_WE:      shape = XC_sb_h_double_arrow; break;
-  case FL_CURSOR_NE:      shape = XC_top_right_corner; break;
-  case FL_CURSOR_N:       shape = XC_top_side; break;
-  case FL_CURSOR_NW:      shape = XC_top_left_corner; break;
-  case FL_CURSOR_E:       shape = XC_right_side; break;
-  case FL_CURSOR_W:       shape = XC_left_side; break;
-  case FL_CURSOR_SE:      shape = XC_bottom_right_corner; break;
-  case FL_CURSOR_S:       shape = XC_bottom_side; break;
-  case FL_CURSOR_SW:      shape = XC_bottom_left_corner; break;
+  case FL_CURSOR_ARROW:   cache_cursor(XC_left_ptr, xc_arrow); break;
+  case FL_CURSOR_CROSS:   cache_cursor(XC_tcross, xc_cross); break;
+  case FL_CURSOR_WAIT:    cache_cursor(XC_watch, xc_wait); break;
+  case FL_CURSOR_INSERT:  cache_cursor(XC_xterm, xc_insert); break;
+  case FL_CURSOR_HAND:    cache_cursor(XC_hand2, xc_hand); break;
+  case FL_CURSOR_HELP:    cache_cursor(XC_question_arrow, xc_help); break;
+  case FL_CURSOR_MOVE:    cache_cursor(XC_fleur, xc_move); break;
+  case FL_CURSOR_NS:      cache_cursor(XC_sb_v_double_arrow, xc_ns); break;
+  case FL_CURSOR_WE:      cache_cursor(XC_sb_h_double_arrow, xc_we); break;
+  case FL_CURSOR_NE:      cache_cursor(XC_top_right_corner, xc_ne); break;
+  case FL_CURSOR_N:       cache_cursor(XC_top_side, xc_n); break;
+  case FL_CURSOR_NW:      cache_cursor(XC_top_left_corner, xc_nw); break;
+  case FL_CURSOR_E:       cache_cursor(XC_right_side, xc_e); break;
+  case FL_CURSOR_W:       cache_cursor(XC_left_side, xc_w); break;
+  case FL_CURSOR_SE:      cache_cursor(XC_bottom_right_corner, xc_se); break;
+  case FL_CURSOR_S:       cache_cursor(XC_bottom_side, xc_s); break;
+  case FL_CURSOR_SW:      cache_cursor(XC_bottom_left_corner, xc_sw); break;
   default:
     return 0;
   }
 
-  xc = XCreateFontCursor(fl_display, shape);
+#undef cache_cursor
+
   XDefineCursor(fl_display, xid, xc);
-  XFreeCursor(fl_display, xc);
 
   return 1;
 }
@@ -2834,7 +2909,7 @@ void Fl_Window::show() {
   if (!shown()) {
     fl_open_display();
     // Don't set background pixel for double-buffered windows...
-    if (type() == FL_WINDOW && can_boxcheat(box())) {
+    if (type() != FL_DOUBLE_WINDOW && can_boxcheat(box())) {
       fl_background_pixel = int(fl_xpixel(color()));
     }
     Fl_X::make_xid(this);
@@ -2870,7 +2945,7 @@ void Fl_Window::make_current() {
 #endif
 }
 
-Window fl_xid_(const Fl_Window *w) {
+FL_EXPORT Window fl_xid_(const Fl_Window *w) {
   Fl_X *temp = Fl_X::i(w);
   return temp ? temp->xid : 0;
 }
@@ -3015,5 +3090,5 @@ void preparePrintFront(void)
 #endif
 
 //
-// End of "$Id: Fl_x.cxx 10197 2014-06-16 11:39:32Z ossman $".
+// End of "$Id: Fl_x.cxx 10412 2014-10-29 20:25:46Z cand $".
 //

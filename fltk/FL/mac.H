@@ -1,5 +1,5 @@
 //
-// "$Id: mac.H 10197 2014-06-16 11:39:32Z ossman $"
+// "$Id: mac.H 10305 2014-09-13 14:29:53Z manolo $"
 //
 // Mac header file for the Fast Light Tool Kit (FLTK).
 //
@@ -63,6 +63,12 @@ typedef CGContextRef Fl_Offscreen;
 #endif
 #ifndef MAC_OS_X_VERSION_10_8
 #define MAC_OS_X_VERSION_10_8 1080
+#endif
+#ifndef MAC_OS_X_VERSION_10_9
+#define MAC_OS_X_VERSION_10_9 1090
+#endif
+#ifndef MAC_OS_X_VERSION_10_10
+#define MAC_OS_X_VERSION_10_10 101000
 #endif
 
 #ifdef __OBJC__
@@ -250,6 +256,6 @@ public:
 /** @} */
 
 //
-// End of "$Id: mac.H 10197 2014-06-16 11:39:32Z ossman $".
+// End of "$Id: mac.H 10305 2014-09-13 14:29:53Z manolo $".
 //
 

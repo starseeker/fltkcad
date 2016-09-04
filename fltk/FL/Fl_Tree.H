@@ -1,5 +1,5 @@
 //
-// "$Id: Fl_Tree.H 10081 2014-01-24 19:03:15Z greg.ercolano $"
+// "$Id: Fl_Tree.H 10275 2014-09-05 12:04:28Z cand $"
 //
 
 #ifndef FL_TREE_H
@@ -317,7 +317,8 @@ enum Fl_Tree_Reason {
   FL_TREE_REASON_RESELECTED,	///< an item was re-selected (e.g. double-clicked)
 #endif /*FLTK_ABI_VERSION*/
   FL_TREE_REASON_OPENED,	///< an item was opened
-  FL_TREE_REASON_CLOSED		///< an item was closed
+  FL_TREE_REASON_CLOSED,	///< an item was closed
+  FL_TREE_REASON_DRAGGED	///< an item was dragged into a new place
 };
 
 class FL_EXPORT Fl_Tree : public Fl_Group {
@@ -574,5 +575,5 @@ public:
 #endif /*FL_TREE_H*/
 
 //
-// End of "$Id: Fl_Tree.H 10081 2014-01-24 19:03:15Z greg.ercolano $".
+// End of "$Id: Fl_Tree.H 10275 2014-09-05 12:04:28Z cand $".
 //

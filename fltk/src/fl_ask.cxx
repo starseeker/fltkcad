@@ -1,5 +1,5 @@
 //
-// "$Id: fl_ask.cxx 10142 2014-05-02 06:41:01Z manolo $"
+// "$Id: fl_ask.cxx 10232 2014-08-21 12:13:47Z cand $"
 //
 // Standard dialog functions for the Fast Light Tool Kit (FLTK).
 //
@@ -126,7 +126,7 @@ static Fl_Window *makeform() {
  *                  that is asked of them...
  */
 
-void resizeform() {
+static void resizeform() {
   int	i;
   int	message_w, message_h;
   int	text_height;
@@ -568,5 +568,5 @@ void fl_message_title_default(const char *title) {
 /** @} */
 
 //
-// End of "$Id: fl_ask.cxx 10142 2014-05-02 06:41:01Z manolo $".
+// End of "$Id: fl_ask.cxx 10232 2014-08-21 12:13:47Z cand $".
 //

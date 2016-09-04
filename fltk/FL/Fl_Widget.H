@@ -1,5 +1,5 @@
 //
-// "$Id: Fl_Widget.H 10096 2014-02-08 01:10:44Z AlbrechtS $"
+// "$Id: Fl_Widget.H 10289 2014-09-08 08:55:49Z cand $"
 //
 // Widget header file for the Fast Light Tool Kit (FLTK).
 //
@@ -777,6 +777,18 @@ public:
    */
   void clear_changed() {flags_ &= ~CHANGED;}
 
+  /** Marks the widget as inactive without sending events or changing focus.
+      This is mainly for specialized use, for normal cases you want deactivate().
+      \see deactivate()
+   */
+  void clear_active() {flags_ |= INACTIVE;}
+
+  /** Marks the widget as active without sending events or changing focus.
+      This is mainly for specialized use, for normal cases you want activate().
+      \see activate()
+   */
+  void set_active() {flags_ &= ~INACTIVE;}
+
   /** Gives the widget the keyboard focus.
       Tries to make this widget be the Fl::focus() widget, by first sending 
       it an FL_FOCUS event, and if it returns non-zero, setting 
@@ -1003,5 +1015,5 @@ public:
 #endif
 
 //
-// End of "$Id: Fl_Widget.H 10096 2014-02-08 01:10:44Z AlbrechtS $".
+// End of "$Id: Fl_Widget.H 10289 2014-09-08 08:55:49Z cand $".
 //

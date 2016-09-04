@@ -1,5 +1,5 @@
 //
-// "$Id: Fl_Image_Surface.H 10200 2014-06-18 01:22:16Z manolo $"
+// "$Id: Fl_Image_Surface.H 10407 2014-10-29 20:01:44Z cand $"
 //
 // Draw-to-image code for the Fast Light Tool Kit (FLTK).
 //
@@ -43,7 +43,7 @@
  Fl_Display_Device::display_device()->set_current();  // direct graphics requests back to the display
  \endcode
 */
-class Fl_Image_Surface : public Fl_Surface_Device {
+class FL_EXPORT Fl_Image_Surface : public Fl_Surface_Device {
 private:
   Fl_Offscreen offscreen;
   int width;
@@ -72,7 +72,7 @@ public:
 
 #ifdef __APPLE__
 /* Mac class to implement translate()/untranslate() for a flipped bitmap graphics context */
-class Fl_Quartz_Flipped_Surface_ : public Fl_Quartz_Surface_ {
+class FL_EXPORT Fl_Quartz_Flipped_Surface_ : public Fl_Quartz_Surface_ {
 public:
   static const char *class_id;
   const char *class_name() {return class_id;};
@@ -86,5 +86,5 @@ public:
 #endif // Fl_Image_Surface_H
 
 //
-// End of "$Id: Fl_Image_Surface.H 10200 2014-06-18 01:22:16Z manolo $".
+// End of "$Id: Fl_Image_Surface.H 10407 2014-10-29 20:01:44Z cand $".
 //

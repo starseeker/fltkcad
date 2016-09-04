@@ -1,5 +1,5 @@
 //
-// "$Id: x.H 10197 2014-06-16 11:39:32Z ossman $"
+// "$Id: x.H 10412 2014-10-29 20:25:46Z cand $"
 //
 // X11 header file for the Fast Light Tool Kit (FLTK).
 //
@@ -52,7 +52,6 @@
 #    endif
 #    include <X11/Xatom.h>
 #    include "Fl_Window.H"
-#    include "Xutf8.h"
 // Mirror X definition of Region to Fl_Region, for portability...
 typedef Region Fl_Region;
 
@@ -93,7 +92,7 @@ typedef ulong Fl_Offscreen;
 #    define fl_end_offscreen() \
   fl_pop_clip(); fl_window = _sw; _ss->set_current()
 
-extern void fl_copy_offscreen(int x, int y, int w, int h, Fl_Offscreen pixmap, int srcx, int srcy);
+extern FL_EXPORT void fl_copy_offscreen(int x, int y, int w, int h, Fl_Offscreen pixmap, int srcx, int srcy);
 #    define fl_delete_offscreen(pixmap) XFreePixmap(fl_display, pixmap)
 
 // Bitmap masks
@@ -161,6 +160,7 @@ public:
   static void x(Fl_Window* wi, int X) {wi->x(X);}
   static void y(Fl_Window* wi, int Y) {wi->y(Y);}
   static int ewmh_supported();
+  static void activate_window(Window w);
 };
 
 extern FL_EXPORT char fl_override_redirect; // hack into Fl_X::make_xid()
@@ -170,7 +170,7 @@ inline Window fl_xid(const Fl_Window* w) { Fl_X *xTemp = Fl_X::i(w); return xTem
 
 #else
 
-extern Window fl_xid_(const Fl_Window* w);
+extern FL_EXPORT Window fl_xid_(const Fl_Window* w);
 #define fl_xid(w) fl_xid_(w)
 
 #endif // FL_LIBRARY || FL_INTERNALS
@@ -187,5 +187,5 @@ extern FL_EXPORT int fl_parse_color(const char* p, uchar& r, uchar& g, uchar& b)
 #endif
 
 //
-// End of "$Id: x.H 10197 2014-06-16 11:39:32Z ossman $".
+// End of "$Id: x.H 10412 2014-10-29 20:25:46Z cand $".
 //

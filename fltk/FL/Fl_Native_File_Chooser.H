@@ -1,5 +1,5 @@
 //
-// "$Id: Fl_Native_File_Chooser.H 10186 2014-06-07 12:01:59Z manolo $"
+// "$Id: Fl_Native_File_Chooser.H 10408 2014-10-29 20:05:05Z cand $"
 //
 // FLTK native OS file chooser widget
 //
@@ -248,7 +248,7 @@ private:
 };
 
 #if !defined(__APPLE__) && !defined(WIN32)
-class Fl_FLTK_File_Chooser {
+class FL_EXPORT Fl_FLTK_File_Chooser {
   friend class Fl_Native_File_Chooser;
 protected:
   int   _btype;			// kind-of browser to show()
@@ -291,7 +291,7 @@ protected:
 };
 
 
-class Fl_GTK_File_Chooser : public Fl_FLTK_File_Chooser {
+class FL_EXPORT Fl_GTK_File_Chooser : public Fl_FLTK_File_Chooser {
   friend class Fl_Native_File_Chooser;
 private:
   typedef struct _GtkWidget GtkWidget;
@@ -336,5 +336,5 @@ private:
 #endif /*FL_NATIVE_FILE_CHOOSER_H*/
 
 //
-// End of "$Id: Fl_Native_File_Chooser.H 10186 2014-06-07 12:01:59Z manolo $".
+// End of "$Id: Fl_Native_File_Chooser.H 10408 2014-10-29 20:05:05Z cand $".
 //

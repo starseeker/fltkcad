@@ -1,5 +1,5 @@
 //
-// "$Id: Fl_Window.H 10197 2014-06-16 11:39:32Z ossman $"
+// "$Id: Fl_Window.H 10404 2014-10-29 14:21:08Z ianmacarthur $"
 //
 // Window header file for the Fast Light Tool Kit (FLTK).
 //
@@ -16,7 +16,7 @@
 //     http://www.fltk.org/str.php
 //
 
-/* \file
+/** \file
    Fl_Window widget . */
 
 #ifndef Fl_Window_H
@@ -27,12 +27,15 @@
 #endif
 
 #include "Fl_Group.H"
+#include "Fl_Bitmap.H"
+#include <stdlib.h>
 
 #define FL_WINDOW 0xF0		///< window type id all subclasses have type() >= this
 #define FL_DOUBLE_WINDOW 0xF1   ///< double window type id
 
 class Fl_X;
 class Fl_RGB_Image;
+
 
 /**
   This widget produces an actual window.  This can either be a main
@@ -74,19 +77,19 @@ class FL_EXPORT Fl_Window : public Fl_Group {
 #endif
   int no_fullscreen_h;
 #if FLTK_ABI_VERSION < 10303
-  static // when these members are static, ABI compatibility with 1.3.2 is respected
+  static // when these members are static, ABI compatibility with 1.3.0 is respected
 #endif
   int fullscreen_screen_top;
 #if FLTK_ABI_VERSION < 10303
-  static // when these members are static, ABI compatibility with 1.3.2 is respected
+  static // when these members are static, ABI compatibility with 1.3.0 is respected
 #endif
   int fullscreen_screen_bottom;
 #if FLTK_ABI_VERSION < 10303
-  static // when these members are static, ABI compatibility with 1.3.2 is respected
+  static // when these members are static, ABI compatibility with 1.3.0 is respected
 #endif
   int fullscreen_screen_left;
 #if FLTK_ABI_VERSION < 10303
-  static // when these members are static, ABI compatibility with 1.3.2 is respected
+  static // when these members are static, ABI compatibility with 1.3.0 is respected
 #endif
   int fullscreen_screen_right;
 
@@ -116,6 +119,40 @@ class FL_EXPORT Fl_Window : public Fl_Group {
   // legacy, not used
   Fl_Color cursor_fg, cursor_bg;
 #endif
+  
+protected:
+  /** Data supporting a non-rectangular window shape */
+  struct shape_data_type {
+    int lw_; ///<  width of shape image
+    int lh_; ///<  height of shape image
+    Fl_Image* shape_; ///<  shape image
+#if defined(__APPLE__)
+    typedef struct CGImage* CGImageRef;
+    CGImageRef mask;
+#endif
+    Fl_Bitmap *todelete_; ///<  auxiliary bitmap image
+  };
+
+#if FLTK_ABI_VERSION < 10303 && !defined(FL_DOXYGEN)
+  static
+#endif
+  shape_data_type *shape_data_; ///< non-null means the window has a non-rectangular shape
+private:
+  void shape_bitmap_(Fl_Bitmap* b);
+  void shape_alpha_(Fl_RGB_Image* img, int offset);
+  void shape_pixmap_(Fl_Pixmap* pixmap);
+public:
+  void shape(const Fl_Image* img);
+  /** Set the window's shape with an Fl_Image.
+   \see void shape(const Fl_Image* img)
+   */
+  inline void shape(const Fl_Image& b) { shape(&b); }
+#if ! (defined(WIN32) || defined(__APPLE__) || defined(FL_DOXYGEN))
+  void combine_mask(void);
+#endif
+private:
+
+
   void size_range_();
   void _Fl_Window(); // constructor innards
   void fullscreen_x(); // platform-specific part of sending a window to full screen
@@ -263,6 +300,45 @@ public:
   unsigned int non_modal() const {return flags() & (NON_MODAL|MODAL);}
 
   /**
+    Clears the "modal" flags and converts a "modal" or "non-modal"
+    window back into a "normal" window.
+
+    Note that there are <I>three</I> states for a window: modal,
+    non-modal, and normal.
+
+    You can not change the "modality" of a window whilst
+    it is shown, so it is necessary to first hide() the window,
+    change its "modality" as required, then re-show the window
+    for the new state to take effect.
+
+    This method can also be used to change a "modal" window into a
+    "non-modal" one. On several supported platforms, the "modal" state
+    over-rides the "non-modal" state, so the "modal" state must be
+    cleared before the window can be set into the "non-modal"
+    state.
+    In general, the following sequence should work:
+
+    \code
+    win->hide();
+    win->clear_modal_states();
+    //Set win to new state as desired, or leave "normal", e.g...
+    win->set_non_modal();
+    win->show();
+    \endcode
+
+    \note Under some window managers, the sequence of hiding the
+    window and changing its modality will often cause it to be
+    re-displayed at a different position when it is subsequently
+    shown. This is an irritating feature but appears to be
+    unavoidable at present.
+    As a result we would advise to use this method only when
+    absolutely necessary.
+
+    \see void set_modal(), void set_non_modal()
+  */
+  void clear_modal_states() {clear_flag(NON_MODAL | MODAL);}
+
+  /**
     Marks the window as a menu window.
 
     This is intended for internal use, but it can also be used if you
@@ -279,7 +355,7 @@ public:
 
   /**  Returns true if this window is a menu window. */
   unsigned int menu_window() const {return flags() & MENU_WINDOW;}
-
+  
   /**
     Marks the window as a tooltip window.
 
@@ -449,6 +525,10 @@ public:
     \see virtual void Fl_Window::show()
   */
   void show(int argc, char **argv);
+
+  // Enables synchronous show(), docs in Fl_Window.cxx
+  void wait_for_expose();
+
   /**
     Makes the window completely fill one or more screens, without any
     window manager border visible.  You must use fullscreen_off() to
@@ -557,5 +637,5 @@ public:
 #endif
 
 //
-// End of "$Id: Fl_Window.H 10197 2014-06-16 11:39:32Z ossman $".
+// End of "$Id: Fl_Window.H 10404 2014-10-29 14:21:08Z ianmacarthur $".
 //

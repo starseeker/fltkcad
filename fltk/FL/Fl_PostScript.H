@@ -1,5 +1,5 @@
 //
-// "$Id: Fl_PostScript.H 9993 2013-09-25 08:55:01Z manolo $"
+// "$Id: Fl_PostScript.H 10308 2014-09-13 17:51:20Z manolo $"
 //
 // Support for graphics output to PostScript file for the Fast Light Tool Kit (FLTK).
 //
@@ -25,6 +25,7 @@
 
 #include <FL/Fl_Paged_Device.H>
 #include <FL/fl_draw.H>
+#include <stdarg.h>
 
 /**
  \brief PostScript graphical backend.
@@ -59,7 +60,7 @@ extern "C" {
 }
 
 class FL_EXPORT Fl_PostScript_Graphics_Driver : public Fl_Graphics_Driver {
-public: 
+public:
   static const char *class_id;
   const char *class_name() {return class_id;};
   Fl_PostScript_Graphics_Driver();
@@ -205,6 +206,7 @@ class Clip {
   void draw(Fl_Pixmap * pxm,int XP, int YP, int WP, int HP, int cx, int cy);
   void draw(Fl_Bitmap * bitmap,int XP, int YP, int WP, int HP, int cx, int cy);
   void draw(Fl_RGB_Image * rgb,int XP, int YP, int WP, int HP, int cx, int cy);
+  int clocale_printf(const char *format, ...);
   ~Fl_PostScript_Graphics_Driver();
 };
 
@@ -222,7 +224,8 @@ public:
   const char *class_name() {return class_id;};
   Fl_PostScript_File_Device();
   ~Fl_PostScript_File_Device();
-  int start_job(int pagecount, enum Fl_Paged_Device::Page_Format format = Fl_Paged_Device::A4, 
+  int start_job(int pagecount, int* from, int* to);
+  int start_job(int pagecount, enum Fl_Paged_Device::Page_Format format = Fl_Paged_Device::A4,
 		enum Fl_Paged_Device::Page_Layout layout = Fl_Paged_Device::PORTRAIT);
   int start_job(FILE *ps_output, int pagecount, enum Fl_Paged_Device::Page_Format format = Fl_Paged_Device::A4, 
 		enum Fl_Paged_Device::Page_Layout layout = Fl_Paged_Device::PORTRAIT);
@@ -247,5 +250,5 @@ public:
 #endif // Fl_PostScript_H
 
 //
-// End of "$Id: Fl_PostScript.H 9993 2013-09-25 08:55:01Z manolo $"
+// End of "$Id: Fl_PostScript.H 10308 2014-09-13 17:51:20Z manolo $"
 //

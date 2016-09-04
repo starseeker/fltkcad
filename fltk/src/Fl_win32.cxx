@@ -1,5 +1,5 @@
 //
-// "$Id: Fl_win32.cxx 10197 2014-06-16 11:39:32Z ossman $"
+// "$Id: Fl_win32.cxx 10387 2014-10-20 15:14:12Z ossman $"
 //
 // WIN32-specific code for the Fast Light Tool Kit (FLTK).
 //
@@ -60,8 +60,6 @@
 #include <ole2.h>
 #include <shellapi.h>
 
-#include "aimm.h"
-
 //
 // USE_ASYNC_SELECT - define it if you have WSAAsyncSelect()...
 // USE_ASYNC_SELECT is OBSOLETED in 1.3 for the following reasons:
@@ -84,9 +82,19 @@
   for async mode proper operation, not mentioning the side effects...
 */
 
+// Internal functions
+static void fl_clipboard_notify_target(HWND wnd);
+static void fl_clipboard_notify_untarget(HWND wnd);
+
+// Internal variables
 static Fl_GDI_Graphics_Driver fl_gdi_driver;
 static Fl_Display_Device fl_gdi_display(&fl_gdi_driver);
 Fl_Display_Device *Fl_Display_Device::_display = &fl_gdi_display; // the platform display
+
+static HWND clipboard_wnd = 0;
+static HWND next_clipboard_wnd = 0;
+
+static bool initial_clipboard = true;
 
 // dynamic wsock dll handling api:
 #if defined(__CYGWIN__) && !defined(SOCKET)
@@ -121,27 +129,24 @@ static HMODULE get_wsock_mod() {
  * size and link dependencies.
  */
 static HMODULE s_imm_module = 0;
+typedef BOOL (WINAPI* flTypeImmAssociateContextEx)(HWND, HIMC, DWORD);
+static flTypeImmAssociateContextEx flImmAssociateContextEx = 0;
 typedef HIMC (WINAPI* flTypeImmGetContext)(HWND);
 static flTypeImmGetContext flImmGetContext = 0;
 typedef BOOL (WINAPI* flTypeImmSetCompositionWindow)(HIMC, LPCOMPOSITIONFORM);
 static flTypeImmSetCompositionWindow flImmSetCompositionWindow = 0;
 typedef BOOL (WINAPI* flTypeImmReleaseContext)(HWND, HIMC);
 static flTypeImmReleaseContext flImmReleaseContext = 0;
-typedef BOOL (WINAPI* flTypeImmIsIME)(HKL);
-static flTypeImmIsIME flImmIsIME = 0;
 
-static HMODULE get_imm_module() {
-  if (!s_imm_module) {
-    s_imm_module = LoadLibrary("IMM32.DLL");
-    if (!s_imm_module)
-      Fl::fatal("FLTK Lib Error: IMM32.DLL file not found!\n\n"
-        "Please check your input method manager library accessibility.");
-    flImmGetContext = (flTypeImmGetContext)GetProcAddress(s_imm_module, "ImmGetContext");
-    flImmSetCompositionWindow = (flTypeImmSetCompositionWindow)GetProcAddress(s_imm_module, "ImmSetCompositionWindow");
-    flImmReleaseContext = (flTypeImmReleaseContext)GetProcAddress(s_imm_module, "ImmReleaseContext");
-    flImmIsIME = (flTypeImmIsIME)GetProcAddress(s_imm_module, "ImmIsIME");
-  }
-  return s_imm_module;
+static void get_imm_module() {
+  s_imm_module = LoadLibrary("IMM32.DLL");
+  if (!s_imm_module)
+    Fl::fatal("FLTK Lib Error: IMM32.DLL file not found!\n\n"
+      "Please check your input method manager library accessibility.");
+  flImmAssociateContextEx = (flTypeImmAssociateContextEx)GetProcAddress(s_imm_module, "ImmAssociateContextEx");
+  flImmGetContext = (flTypeImmGetContext)GetProcAddress(s_imm_module, "ImmGetContext");
+  flImmSetCompositionWindow = (flTypeImmSetCompositionWindow)GetProcAddress(s_imm_module, "ImmSetCompositionWindow");
+  flImmReleaseContext = (flTypeImmReleaseContext)GetProcAddress(s_imm_module, "ImmReleaseContext");
 }
 
 // USE_TRACK_MOUSE - define NO_TRACK_MOUSE if you don't have
@@ -206,6 +211,9 @@ static Fl_Window *track_mouse_win=0;	// current TrackMouseEvent() window
 #  define WHEEL_DELTA 120	// according to MSDN.
 #endif
 
+#ifndef SM_CXPADDEDBORDER
+#  define SM_CXPADDEDBORDER (92) // STR #3061
+#endif
 
 //
 // WM_FLSELECT is the user-defined message that we get when one of
@@ -259,7 +267,9 @@ void fl_set_spot(int font, int size, int X, int Y, int W, int H, Fl_Window *win)
   Fl_Window* tw = win;
   while (tw->parent()) tw = tw->window(); // find top level window
 
-  get_imm_module();
+  if (!tw->shown())
+    return;
+
   HIMC himc = flImmGetContext(fl_xid(tw));
 
   if (himc) {
@@ -336,7 +346,8 @@ void* Fl::thread_message() {
   return r;
 }
 
-IActiveIMMApp *fl_aimm = NULL;
+extern int fl_send_system_handlers(void *e);
+
 MSG fl_msg;
 
 // This is never called with time_to_wait < 0.0.
@@ -401,26 +412,25 @@ int fl_wait(double time_to_wait) {
 
   // Execute the message we got, and all other pending messages:
   // have_message = PeekMessage(&fl_msg, NULL, 0, 0, PM_REMOVE);
-  have_message = PeekMessageW(&fl_msg, NULL, 0, 0, PM_REMOVE);
-  if (have_message > 0) {
-    while (have_message != 0 && have_message != -1) {
-      // Let applications treat WM_QUIT identical to SIGTERM on *nix
-      if (fl_msg.message == WM_QUIT)
-        raise(SIGTERM);
-      if (fl_msg.message == fl_wake_msg) {
-        // Used for awaking wait() from another thread
-	thread_message_ = (void*)fl_msg.wParam;
-        Fl_Awake_Handler func;
-        void *data;
-        while (Fl::get_awake_handler_(func, data)==0) {
-          func(data);
-        }
-      }
+  while ((have_message = PeekMessageW(&fl_msg, NULL, 0, 0, PM_REMOVE)) > 0) {
+    if (fl_send_system_handlers(&fl_msg))
+      continue;
 
-      TranslateMessage(&fl_msg);
-      DispatchMessageW(&fl_msg);
-      have_message = PeekMessageW(&fl_msg, NULL, 0, 0, PM_REMOVE);
+    // Let applications treat WM_QUIT identical to SIGTERM on *nix
+    if (fl_msg.message == WM_QUIT)
+      raise(SIGTERM);
+
+    if (fl_msg.message == fl_wake_msg) {
+      // Used for awaking wait() from another thread
+      thread_message_ = (void*)fl_msg.wParam;
+      Fl_Awake_Handler func;
+      void *data;
+      while (Fl::get_awake_handler_(func, data)==0)
+        func(data);
     }
+
+    TranslateMessage(&fl_msg);
+    DispatchMessageW(&fl_msg);
   }
   Fl::flush();
 
@@ -438,6 +448,63 @@ int fl_ready() {
   fd_set fdt[3];
   memcpy(fdt, fdsets, sizeof fdt);
   return get_wsock_mod() ? s_wsock_select(0,&fdt[0],&fdt[1],&fdt[2],&t) : 0;
+}
+
+void fl_open_display() {
+  static char beenHereDoneThat = 0;
+
+  if (beenHereDoneThat)
+    return;
+
+  beenHereDoneThat = 1;
+
+  OleInitialize(0L);
+
+  get_imm_module();
+}
+
+class Fl_Win32_At_Exit {
+public:
+  Fl_Win32_At_Exit() { }
+  ~Fl_Win32_At_Exit() {
+    fl_free_fonts();        // do some WIN32 cleanup
+    fl_cleanup_pens();
+    OleUninitialize();
+    fl_brush_action(1);
+    fl_cleanup_dc_list();
+    // This is actually too late in the cleanup process to remove the
+    // clipboard notifications, but we have no earlier hook so we try
+    // to work around it anyway.
+    if (clipboard_wnd != NULL)
+      fl_clipboard_notify_untarget(clipboard_wnd);
+  }
+};
+static Fl_Win32_At_Exit win32_at_exit;
+
+static char im_enabled = 1;
+
+void Fl::enable_im() {
+  fl_open_display();
+
+  Fl_X* i = Fl_X::first;
+  while (i) {
+    flImmAssociateContextEx(i->xid, 0, IACE_DEFAULT);
+    i = i->next;
+  }
+
+  im_enabled = 1;
+}
+
+void Fl::disable_im() {
+  fl_open_display();
+
+  Fl_X* i = Fl_X::first;
+  while (i) {
+    flImmAssociateContextEx(i->xid, 0, 0);
+    i = i->next;
+  }
+
+  im_enabled = 0;
 }
 
 ////////////////////////////////////////////////////////////////
@@ -734,27 +801,7 @@ int Fl::clipboard_contains(const char *type)
   return retval;
 }
 
-static HWND clipboard_wnd = 0;
-static HWND next_clipboard_wnd = 0;
-
-static bool initial_clipboard = true;
-void fl_clipboard_notify_target(HWND wnd);
-
-void fl_clipboard_notify_change() {
-  // untarget clipboard monitor if no handlers are registered
-  if (clipboard_wnd != NULL && fl_clipboard_notify_empty())
-  {
-    fl_clipboard_notify_untarget(clipboard_wnd);
-    return;
-  }
-
-  // if there are clipboard notify handlers but no window targeted
-  // target first window if available
-  if (clipboard_wnd == NULL && Fl::first_window())
-    fl_clipboard_notify_target(fl_xid(Fl::first_window()));
-}
-
-void fl_clipboard_notify_target(HWND wnd) {
+static void fl_clipboard_notify_target(HWND wnd) {
   if (clipboard_wnd)
     return;
 
@@ -766,19 +813,64 @@ void fl_clipboard_notify_target(HWND wnd) {
   next_clipboard_wnd = SetClipboardViewer(wnd);
 }
 
-void fl_clipboard_notify_untarget(HWND wnd) {
+static void fl_clipboard_notify_untarget(HWND wnd) {
   if (wnd != clipboard_wnd)
     return;
 
-  ChangeClipboardChain(wnd, next_clipboard_wnd);
+  // We might be called late in the cleanup where Windows has already
+  // implicitly destroyed our clipboard window. At that point we need
+  // to do some extra work to manually repair the clipboard chain.
+  if (IsWindow(wnd))
+    ChangeClipboardChain(wnd, next_clipboard_wnd);
+  else {
+    HWND tmp, head;
+
+    tmp = CreateWindow("STATIC", "Temporary FLTK Clipboard Window", 0,
+                       0, 0, 0, 0, HWND_MESSAGE, NULL, NULL, NULL);
+    if (tmp == NULL)
+      return;
+
+    head = SetClipboardViewer(tmp);
+    if (head == NULL)
+      ChangeClipboardChain(tmp, next_clipboard_wnd);
+    else {
+      SendMessage(head, WM_CHANGECBCHAIN, (WPARAM)wnd, (LPARAM)next_clipboard_wnd);
+      ChangeClipboardChain(tmp, head);
+    }
+
+    DestroyWindow(tmp);
+  }
+
   clipboard_wnd = next_clipboard_wnd = 0;
+}
+
+void fl_clipboard_notify_retarget(HWND wnd) {
+  // The given window is getting destroyed. If it's part of the
+  // clipboard chain then we need to unregister it and find a
+  // replacement window.
+  if (wnd != clipboard_wnd)
+    return;
+
+  fl_clipboard_notify_untarget(wnd);
 
   if (Fl::first_window())
     fl_clipboard_notify_target(fl_xid(Fl::first_window()));
 }
 
+void fl_clipboard_notify_change() {
+  // untarget clipboard monitor if no handlers are registered
+  if (clipboard_wnd != NULL && fl_clipboard_notify_empty()) {
+    fl_clipboard_notify_untarget(clipboard_wnd);
+    return;
+  }
+
+  // if there are clipboard notify handlers but no window targeted
+  // target first window if available
+  if (clipboard_wnd == NULL && Fl::first_window())
+    fl_clipboard_notify_target(fl_xid(Fl::first_window()));
+}
+
 ////////////////////////////////////////////////////////////////
-char fl_is_ime = 0;
 void fl_get_codepage()
 {
   HKL hkl = GetKeyboardLayout(0);
@@ -786,14 +878,7 @@ void fl_get_codepage()
 
   GetLocaleInfo (LOWORD(hkl), LOCALE_IDEFAULTANSICODEPAGE, ld, 6);
   DWORD ccp = atol(ld);
-  fl_is_ime = 0;
-
   fl_codepage = ccp;
-  if (fl_aimm) {
-    fl_aimm->GetCodePageA(GetKeyboardLayout(0), &fl_codepage);
-  } else if (get_imm_module() && flImmIsIME(hkl)) {
-    fl_is_ime = 1;
-  }
 }
 
 HWND fl_capture;
@@ -1444,13 +1529,17 @@ int Fl_X::fake_X_wm(const Fl_Window* w,int &X,int &Y, int &bt,int &bx, int &by) 
   if (fallback) {
     if (w->border() && !w->parent()) {
       if (w->size_range_set && (w->maxw != w->minw || w->maxh != w->minh)) {
-        ret = 2;
-        bx = GetSystemMetrics(SM_CXSIZEFRAME);
-        by = GetSystemMetrics(SM_CYSIZEFRAME);
+	ret = 2;
+	bx = GetSystemMetrics(SM_CXSIZEFRAME);
+	by = GetSystemMetrics(SM_CYSIZEFRAME);
       } else {
-        ret = 1;
-        bx = GetSystemMetrics(SM_CXFIXEDFRAME);
-        by = GetSystemMetrics(SM_CYFIXEDFRAME);
+	ret = 1;
+	int padding = GetSystemMetrics(SM_CXPADDEDBORDER);
+	NONCLIENTMETRICS ncm;
+	ncm.cbSize = sizeof(NONCLIENTMETRICS);
+	SystemParametersInfo(SPI_GETNONCLIENTMETRICS, 0, &ncm, 0);
+	bx = GetSystemMetrics(SM_CXFIXEDFRAME) + (padding ? padding + ncm.iBorderWidth : 0);
+	by = GetSystemMetrics(SM_CYFIXEDFRAME) + (padding ? padding + ncm.iBorderWidth : 0);
       }
       bt = GetSystemMetrics(SM_CYCAPTION);
     }
@@ -1659,6 +1748,8 @@ int fl_disable_transient_for; // secret method of removing TRANSIENT_FOR
 Fl_X* Fl_X::make(Fl_Window* w) {
   Fl_Group::current(0); // get rid of very common user bug: forgot end()
 
+  fl_open_display();
+
   // if the window is a subwindow and our parent is not mapped yet, we
   // mark this window visible, so that mapping the parent at a later
   // point in time will call this function again to finally map the subwindow.
@@ -1820,6 +1911,9 @@ Fl_X* Fl_X::make(Fl_Window* w) {
   );
   if (lab) free(lab);
 
+  x->next = Fl_X::first;
+  Fl_X::first = x;
+
   x->set_icons();
 
   if (w->fullscreen_active()) {
@@ -1833,9 +1927,6 @@ Fl_X* Fl_X::make(Fl_Window* w) {
     x->make_fullscreen(rect.left, rect.top, 
                        rect.right - rect.left, rect.bottom - rect.top);
   }
-
-  x->next = Fl_X::first;
-  Fl_X::first = x;
 
   // Setup clipboard monitor target if there are registered handlers and
   // no window is targeted.
@@ -1862,16 +1953,10 @@ Fl_X* Fl_X::make(Fl_Window* w) {
 	     (Fl::grab() || (styleEx & WS_EX_TOOLWINDOW)) ? SW_SHOWNOACTIVATE : SW_SHOWNORMAL);
 
   // Register all windows for potential drag'n'drop operations
-  fl_OleInitialize();
   RegisterDragDrop(x->xid, flIDropTarget);
 
-  if (!fl_aimm) {
-    CoCreateInstance(CLSID_CActiveIMM, NULL, CLSCTX_INPROC_SERVER,
-		     IID_IActiveIMMApp, (void**) &fl_aimm);
-    if (fl_aimm) {
-      fl_aimm->Activate(TRUE);
-    }
-  }
+  if (!im_enabled)
+    flImmAssociateContextEx(x->xid, 0, 0);
 
   return x;
 }
@@ -2676,5 +2761,5 @@ void preparePrintFront(void)
 #endif // FL_DOXYGEN
 
 //
-// End of "$Id: Fl_win32.cxx 10197 2014-06-16 11:39:32Z ossman $".
+// End of "$Id: Fl_win32.cxx 10387 2014-10-20 15:14:12Z ossman $".
 //

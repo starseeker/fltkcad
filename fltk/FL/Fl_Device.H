@@ -1,5 +1,5 @@
 //
-// "$Id: Fl_Device.H 10110 2014-02-22 14:51:50Z manolo $"
+// "$Id: Fl_Device.H 10409 2014-10-29 20:11:02Z cand $"
 //
 // Definition of classes Fl_Device, Fl_Graphics_Driver, Fl_Surface_Device, Fl_Display_Device
 // for the Fast Light Tool Kit (FLTK).
@@ -491,7 +491,7 @@ public:
  *
  This class is implemented only on the Xlib platform.
  */
-class Fl_Xlib_Graphics_Driver : public Fl_Graphics_Driver {
+class FL_EXPORT Fl_Xlib_Graphics_Driver : public Fl_Graphics_Driver {
 public:
   static const char *class_id;
   const char *class_name() {return class_id;};
@@ -580,5 +580,5 @@ public:
 #endif // Fl_Device_H
 
 //
-// End of "$Id: Fl_Device.H 10110 2014-02-22 14:51:50Z manolo $".
+// End of "$Id: Fl_Device.H 10409 2014-10-29 20:11:02Z cand $".
 //

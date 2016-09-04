@@ -1,9 +1,9 @@
 //
-// "$Id: Enumerations.H 10196 2014-06-16 11:17:57Z ossman $"
+// "$Id: Enumerations.H 10382 2014-10-15 21:00:20Z ianmacarthur $"
 //
 // Enumerations for the Fast Light Tool Kit (FLTK).
 //
-// Copyright 1998-2012 by Bill Spitzak and others.
+// Copyright 1998-2014 by Bill Spitzak and others.
 //
 // This library is free software. Distribution and use rights are outlined in
 // the file "COPYING" which should have been included with this file.  If this
@@ -27,7 +27,7 @@
  * in the current patch release of FLTK. ** Use for static builds only! **
  * For more info on this macro, see: http://fltk.org/cmp.php#FLTK_ABI_VERSION
  */
-#define FLTK_ABI_VERSION 10303
+//#define FLTK_ABI_VERSION 10303
 
 #  include "Fl_Export.H"
 #  include "fl_types.h"
@@ -59,7 +59,7 @@
 
    FLTK remains binary compatible between patches.
  */
-#define FL_PATCH_VERSION	2
+#define FL_PATCH_VERSION	3
 
 /**
     The FLTK version number as a \em double.
@@ -931,7 +931,7 @@ enum Fl_Cursor {
   FL_CURSOR_W          = 36, /**< leftwards resize. */
   FL_CURSOR_NW         = 68, /**< upwards, left resize. */
 
-  FL_CURSOR_NONE       =255, /**< invisible. */
+  FL_CURSOR_NONE       =255  /**< invisible. */
 };
 /*@}*/		// group: Cursors  
 
@@ -984,5 +984,5 @@ enum Fl_Damage {
 #endif
 
 //
-// End of "$Id: Enumerations.H 10196 2014-06-16 11:17:57Z ossman $".
+// End of "$Id: Enumerations.H 10382 2014-10-15 21:00:20Z ianmacarthur $".
 //

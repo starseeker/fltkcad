@@ -1,5 +1,5 @@
 //
-// "$Id: Fl_Tree_Item_Array.H 10071 2014-01-20 21:23:24Z greg.ercolano $"
+// "$Id: Fl_Tree_Item_Array.H 10271 2014-09-04 18:56:52Z greg.ercolano $"
 //
 
 #ifndef _FL_TREE_ITEM_ARRAY_H
@@ -84,6 +84,9 @@ public:
     _items[bx] = asave;
   }
 #endif /*FLTK_ABI_VERSION*/
+  int move(int to, int from);
+  int deparent(int pos);
+  int reparent(Fl_Tree_Item *item, Fl_Tree_Item *newparent, int pos);
   void clear();
   void add(Fl_Tree_Item *val);
   void insert(int pos, Fl_Tree_Item *new_item);
@@ -106,5 +109,5 @@ public:
 #endif /*_FL_TREE_ITEM_ARRAY_H*/
 
 //
-// End of "$Id: Fl_Tree_Item_Array.H 10071 2014-01-20 21:23:24Z greg.ercolano $".
+// End of "$Id: Fl_Tree_Item_Array.H 10271 2014-09-04 18:56:52Z greg.ercolano $".
 //

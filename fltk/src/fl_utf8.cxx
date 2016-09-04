@@ -1,5 +1,5 @@
 //
-// "$Id: fl_utf8.cxx 10089 2014-01-31 15:52:56Z greg.ercolano $"
+// "$Id: fl_utf8.cxx 10248 2014-08-23 08:41:58Z cand $"
 //
 // Unicode to UTF-8 conversion functions.
 //
@@ -58,7 +58,7 @@ extern "C" {
 
 #else // X-windows platform
 
-# include <FL/Xutf8.h>
+# include "Xutf8.h"
 # include <sys/types.h>
 # include <sys/stat.h>
 # include <fcntl.h>
@@ -825,5 +825,5 @@ void fl_make_path_for_file( const char *path )
 /** @} */
 
 //
-// End of "$Id: fl_utf8.cxx 10089 2014-01-31 15:52:56Z greg.ercolano $".
+// End of "$Id: fl_utf8.cxx 10248 2014-08-23 08:41:58Z cand $".
 //

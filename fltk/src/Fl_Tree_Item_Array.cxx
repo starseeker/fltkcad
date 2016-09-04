@@ -1,5 +1,5 @@
 //
-// "$Id: Fl_Tree_Item_Array.cxx 10071 2014-01-20 21:23:24Z greg.ercolano $"
+// "$Id: Fl_Tree_Item_Array.cxx 10272 2014-09-05 02:59:00Z greg.ercolano $"
 //
 
 #include <stdio.h>
@@ -233,6 +233,77 @@ void Fl_Tree_Item_Array::swap(int ax, int bx) {
 }
 #endif /* FLTK_ABI_VERSION */
 
+/// Move item at 'from' to new position 'to' in the array.
+/// Due to how the moving an item shuffles the array around,
+/// a positional 'move' implies things that may not be obvious:
+/// - When 'from' moved lower in tree, appears BELOW item that was at 'to'.
+/// - When 'from' moved higher in tree, appears ABOVE item that was at 'to'.
+///
+///     \returns 0 on success, -1 on range error (e.g. if \p 'to' or \p 'from' out of range)
+///
+int Fl_Tree_Item_Array::move(int to, int from) {
+  if ( from == to ) return 0;    // nop
+  if ( to<0 || to>=_total || from<0 || from>=_total ) return -1;
+  Fl_Tree_Item *item = _items[from];
+  // Remove item..
+  if ( from < to )
+    for ( int t=from; t<to && t<(_total+1); t++ )
+      _items[t] = _items[t+1];
+  else
+    for ( int t=from; t>to && t>0; t-- )
+      _items[t] = _items[t-1];
+  // Move to new position
+  _items[to] = item;
+  // Update all children
+  for ( int r=0; r<_total; r++ )	// XXX: excessive to do all children,
+    _items[r]->update_prev_next(r);	// XXX: but avoids weird boundary issues
+  return 0;
+}
+
+/// Deparent item at \p 'pos' from our list of children.
+/// Similar to a remove() without the destruction of the item.
+/// This creates an orphaned item (still allocated, has no parent)
+/// which soon after is typically reparented elsewhere.
+///
+///     \returns 0 on success, -1 on error (e.g. if \p 'pos' out of range)
+///
+int Fl_Tree_Item_Array::deparent(int pos) {
+  if ( pos>=_total || pos<0 ) return -1;
+  // Save item being deparented, and its two nearest siblings
+  Fl_Tree_Item *item = _items[pos];
+  Fl_Tree_Item *prev = item->prev_sibling();
+  Fl_Tree_Item *next = item->next_sibling();
+  // Remove from parent's list of children
+  _total -= 1;
+  for ( int t=pos; t<_total; t++ )
+    _items[t] = _items[t+1];            // delete, no destroy
+  // Now an orphan: remove association with old parent and siblings
+  item->update_prev_next(-1);           // become an orphan
+  // Adjust bereaved siblings
+  if ( prev ) prev->update_prev_next(pos-1);
+  if ( next ) next->update_prev_next(pos);
+  return 0;
+}
+
+/// Reparent specified item as a child of ourself.
+/// Typically 'newchild' was recently orphaned with deparent().
+///
+///     \returns 0 on success, -1 on error (e.g. if \p 'pos' out of range)
+///
+int Fl_Tree_Item_Array::reparent(Fl_Tree_Item *item, Fl_Tree_Item* newparent, int pos) {
+  if ( pos<0 || pos>_total ) return -1;
+  // Add item to new parent
+  enlarge(1);
+  _total += 1;
+  for ( int t=_total-1; t>pos; --t )    // shuffle array to make room for new entry
+    _items[t] = _items[t-1];
+  _items[pos] = item;                   // insert new entry
+  // Attach to new parent and siblings
+  _items[pos]->parent(newparent);       // reparent (update_prev_next() needs this)
+  _items[pos]->update_prev_next(pos);   // find new siblings
+  return 0;
+}
+
 //
-// End of "$Id: Fl_Tree_Item_Array.cxx 10071 2014-01-20 21:23:24Z greg.ercolano $".
+// End of "$Id: Fl_Tree_Item_Array.cxx 10272 2014-09-05 02:59:00Z greg.ercolano $".
 //

@@ -1,5 +1,5 @@
 //
-// "$Id: Fl.H 10186 2014-06-07 12:01:59Z manolo $"
+// "$Id: Fl.H 10419 2014-10-30 16:05:22Z AlbrechtS $"
 //
 // Main header file for the Fast Light Tool Kit (FLTK).
 //
@@ -95,6 +95,9 @@ typedef void (*Fl_FD_Handler)(FL_SOCKET fd, void *data);
 
 /** Signature of add_handler functions passed as parameters */
 typedef int (*Fl_Event_Handler)(int event);
+
+/** Signature of add_system_handler functions passed as parameters */
+typedef int (*Fl_System_Handler)(void *event, void *data);
 
 /** Signature of set_abort functions passed as parameters */
 typedef void (*Fl_Abort_Handler)(const char *format,...);
@@ -754,6 +757,17 @@ public:
   static int event_inside(const Fl_Widget*);
   static int test_shortcut(Fl_Shortcut);
 
+  /**
+    Enables the system input methods facilities. This is the default.
+    \see disable_im()
+  */
+  static void enable_im();
+  /**
+    Disables the system input methods facilities.
+    \see enable_im()
+  */
+  static void disable_im();
+
   // event destinations:
   static int handle(int, Fl_Window*);
   static int handle_(int, Fl_Window*);
@@ -770,6 +784,8 @@ public:
   static void focus(Fl_Widget*);
   static void add_handler(Fl_Event_Handler h);
   static void remove_handler(Fl_Event_Handler h);
+  static void add_system_handler(Fl_System_Handler h, void *data);
+  static void remove_system_handler(Fl_System_Handler h);
   static void event_dispatch(Fl_Event_Dispatch d);
   static Fl_Event_Dispatch event_dispatch();
   /** @} */
@@ -1137,16 +1153,6 @@ public:
   static void awake(void* message = 0);
   /** See void awake(void* message=0). */
   static int awake(Fl_Awake_Handler cb, void* message = 0);
- 
-  // Cross platform sleep API
-
-  /** flexible sleep function in seconds, accepts decimals typically up to 100usec resolution (depends on your hardware) */
-  static void sleep(double seconds);
-  /** milli seconds sleep */
-  static void msleep(unsigned long milliseconds);
-  /** microseconds sleep */
-  static void usleep(unsigned long long microseconds);
-  
   /**
     The thread_message() method returns the last message
     that was sent from a child by the awake() method.
@@ -1330,5 +1336,5 @@ public:
 #endif // !Fl_H
 
 //
-// End of "$Id: Fl.H 10186 2014-06-07 12:01:59Z manolo $".
+// End of "$Id: Fl.H 10419 2014-10-30 16:05:22Z AlbrechtS $".
 //

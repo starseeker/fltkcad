@@ -1,12 +1,12 @@
 //
-// "$Id: Fl_Text_Display.cxx 10152 2014-05-21 06:56:59Z greg.ercolano $"
+// "$Id: Fl_Text_Display.cxx 10416 2014-10-30 12:35:36Z AlbrechtS $"
 //
-// Copyright 2001-2010 by Bill Spitzak and others.
+// Copyright 2001-2014 by Bill Spitzak and others.
 // Original code Copyright Mark Edel.  Permission to distribute under
 // the LGPL for the FLTK library granted by Mark Edel.
 //
 // This library is free software. Distribution and use rights are outlined in
-// the file "COPYING" which should have been included with this file.  If this
+// the file "COPYING" which should have been included with this file. If this
 // file is missing or damaged, see the license at:
 //
 //     http://www.fltk.org/COPYING.php
@@ -25,6 +25,7 @@
 #include "flstring.h"
 #include <limits.h>
 #include <ctype.h>
+#include <string.h>	// strdup()
 #include <FL/Fl.H>
 #include <FL/Fl_Text_Buffer.H>
 #include <FL/Fl_Text_Display.H>
@@ -158,7 +159,7 @@ Fl_Text_Display::Fl_Text_Display(int X, int Y, int W, int H, const char* l)
   linenumber_fgcolor_ = FL_INACTIVE_COLOR;
   linenumber_bgcolor_ = 53;	// ~90% gray
   linenumber_align_   = FL_ALIGN_RIGHT;
-  linenumber_format_  = "%d";
+  linenumber_format_  = strdup("%d");
 #endif
 }
 
@@ -180,6 +181,12 @@ Fl_Text_Display::~Fl_Text_Display() {
     mBuffer->remove_predelete_callback(buffer_predelete_cb, this);
   }
   if (mLineStarts) delete[] mLineStarts;
+#if FLTK_ABI_VERSION >= 10303
+  if (linenumber_format_) {
+    free((void*)linenumber_format_);
+    linenumber_format_ = 0;
+  }
+#endif
 }
 
 
@@ -321,7 +328,15 @@ Fl_Align Fl_Text_Display::linenumber_align() const {
 
 /**
  Sets the printf() style format string used for line numbers.
- Default is "%d" for normal unpadded decimal integers. Example values:
+ Default is "%d" for normal unpadded decimal integers. 
+
+ An internal copy of \p val is allocated and managed;
+ it is automatically freed whenever a new value is assigned,
+ or when the widget is destroyed.
+ 
+ The value of \p val must \a not be NULL.
+
+ Example values:
 
      - "%d"   -- For normal line numbers without padding (Default)
      - "%03d" -- For 000 padding
@@ -332,7 +347,8 @@ Fl_Align Fl_Text_Display::linenumber_align() const {
 */
 void Fl_Text_Display::linenumber_format(const char* val) {
 #if FLTK_ABI_VERSION >= 10303
-  linenumber_format_ = val;
+  if ( linenumber_format_ ) free((void*)linenumber_format_);
+  linenumber_format_ = val ? strdup(val) : 0;
 #else
   // do nothing
 #endif
@@ -2872,8 +2888,6 @@ void Fl_Text_Display::draw_line_numbers(bool /*clearAll*/) {
     Y = y();
     line = get_absolute_top_line_number();
 
-    int last_y = y();
-
     // set font color for line numbers
     fl_color(linenumber_fgcolor());
     for (visLine=0; visLine < mNVisibleLines; visLine++) {
@@ -2886,7 +2900,6 @@ void Fl_Text_Display::draw_line_numbers(bool /*clearAll*/) {
 	    hh = lineHeight;
 	fl_draw(lineNumString, xx, yy, ww, hh, linenumber_align(), 0, 0);
 	//DEBUG fl_rect(xx, yy, ww, hh);
-	last_y = Y;
 	line++;
       } else {
 	if (visLine == 0) line++;
@@ -3250,12 +3263,13 @@ void Fl_Text_Display::measure_deleted_lines(int pos, int nDeleted) {
  and the styleBufOffset argument must indicate the starting position of the
  copy, to take into account the correct style information.
 
- \param buf
- \param startPos
- \param maxPos
- \param maxLines
- \param startPosIsLineStart
- \param styleBufOffset
+ \param[in] buf      The text buffer to operate on
+ \param[in] startPos Starting index position into the buffer
+ \param[in] maxPos   Maximum index position into the buffer we'll reach
+ \param[in] maxLines Maximum number of lines we'll reach
+ \param[in] startPosIsLineStart  Flag indicating if startPos is start of line.
+                                 (If set, prevents our having to find the line start)
+ \param[in] styleBufOffset Offset index position into style buffer.
 
  \param[out] retPos Position where counting ended.  When counting lines, the
     position returned is the start of the line "maxLines" lines
@@ -3355,9 +3369,13 @@ void Fl_Text_Display::wrapped_line_counter(Fl_Text_Buffer *buf, int startPos,
       if (b<lineStart) b = lineStart;
       if (!foundBreak) { /* no whitespace, just break at margin */
         newLineStart = max(p, buf->next_char(lineStart));
-        const char *s = buf->address(b);
         colNum++;
-        width = measure_proportional_character(s, 0, p+styleBufOffset);
+	if (b >= buf->length()) { // STR #2730
+	  width = 0;
+	} else {
+	  const char *s = buf->address(b);
+	  width = measure_proportional_character(s, 0, p+styleBufOffset);
+	}
       }
       if (p >= maxPos) {
         *retPos = maxPos;
@@ -4015,5 +4033,5 @@ double Fl_Text_Display::col_to_x(double col) const
 
 
 //
-// End of "$Id: Fl_Text_Display.cxx 10152 2014-05-21 06:56:59Z greg.ercolano $".
+// End of "$Id: Fl_Text_Display.cxx 10416 2014-10-30 12:35:36Z AlbrechtS $".
 //

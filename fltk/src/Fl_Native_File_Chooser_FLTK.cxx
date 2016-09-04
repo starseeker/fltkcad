@@ -1,4 +1,4 @@
-// "$Id: Fl_Native_File_Chooser_FLTK.cxx 10186 2014-06-07 12:01:59Z manolo $"
+// "$Id: Fl_Native_File_Chooser_FLTK.cxx 10349 2014-10-01 17:24:55Z manolo $"
 //
 // FLTK native file chooser widget wrapper for GTK's GtkFileChooserDialog 
 //
@@ -16,6 +16,7 @@
 //     http://www.fltk.org/str.php
 //
 
+#include <config.h>
 #include <FL/Fl_Native_File_Chooser.H>
 #include <FL/Fl_File_Icon.H>
 #define FLTK_CHOOSER_SINGLE    Fl_File_Chooser::SINGLE
@@ -50,9 +51,11 @@ Fl_Native_File_Chooser::Fl_Native_File_Chooser(int val) {
 #endif // FLTK_ABI_VERSION
   if (have_looked_for_GTK_libs == 0) {
     // First Time here, try to find the GTK libs if they are installed
+#if HAVE_DLSYM && HAVE_DLFCN_H
     if (Fl::option(Fl::OPTION_FNFC_USES_GTK)) {
       Fl_GTK_File_Chooser::probe_for_GTK_libs();
     }
+#endif
     have_looked_for_GTK_libs = -1;
   }
   // if we found all the GTK functions we need, we will use the GtkFileChooserDialog
@@ -502,5 +505,5 @@ int Fl_FLTK_File_Chooser::exist_dialog() {
 }
 
 //
-// End of "$Id: Fl_Native_File_Chooser_FLTK.cxx 10186 2014-06-07 12:01:59Z manolo $".
+// End of "$Id: Fl_Native_File_Chooser_FLTK.cxx 10349 2014-10-01 17:24:55Z manolo $".
 //

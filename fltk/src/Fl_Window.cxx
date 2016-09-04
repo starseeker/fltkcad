@@ -1,5 +1,5 @@
 //
-// "$Id: Fl_Window.cxx 10197 2014-06-16 11:39:32Z ossman $"
+// "$Id: Fl_Window.cxx 10405 2014-10-29 15:53:52Z manolo $"
 //
 // Window widget class for the Fast Light Tool Kit (FLTK).
 //
@@ -52,6 +52,7 @@ void Fl_Window::_Fl_Window() {
   resizable(0);
   size_range_set = 0;
   minw = maxw = minh = maxh = 0;
+  shape_data_ = NULL;
 #if FLTK_ABI_VERSION >= 10301
   no_fullscreen_x = 0;
   no_fullscreen_y = 0;
@@ -77,6 +78,25 @@ Fl_Window::Fl_Window(int W, int H, const char *l)
   _Fl_Window();
   clear_visible();
 }
+
+Fl_Window::~Fl_Window() {
+  hide();
+  if (xclass_) {
+    free(xclass_);
+  }
+  free_icons();
+  delete icon_;
+  if (shape_data_) {
+    if (shape_data_->todelete_) delete shape_data_->todelete_;
+#if defined(__APPLE__)
+    if (shape_data_->mask) {
+      CGImageRelease(shape_data_->mask);
+    }
+#endif
+    delete shape_data_;
+  }
+}
+
 
 /** Returns a pointer to the nearest parent window up the widget hierarchy.
     This will return sub-windows if there are any, or the parent window if there's no sub-windows.
@@ -133,50 +153,11 @@ int Fl_Window::y_root() const {
   return y();
 }
 
-void Fl_Window::draw() {
-
-  // The following is similar to Fl_Group::draw(), but ...
-  //  - we draw the box with x=0 and y=0 instead of x() and y()
-  //  - we don't draw a label
-
-  if (damage() & ~FL_DAMAGE_CHILD) {	 // draw the entire thing
-    draw_box(box(),0,0,w(),h(),color()); // draw box with x/y = 0
-  }
-  draw_children();
-
-#ifdef __APPLE_QUARTZ__
-  // on OS X, windows have no frame. Before OS X 10.7, to resize a window, we drag the lower right
-  // corner. This code draws a little ribbed triangle for dragging.
-  if (fl_mac_os_version < 100700 && fl_gc && !parent() && resizable() && 
-      (!size_range_set || minh!=maxh || minw!=maxw)) {
-    int dx = Fl::box_dw(box())-Fl::box_dx(box());
-    int dy = Fl::box_dh(box())-Fl::box_dy(box());
-    if (dx<=0) dx = 1;
-    if (dy<=0) dy = 1;
-    int x1 = w()-dx-1, x2 = x1, y1 = h()-dx-1, y2 = y1;
-    Fl_Color c[4] = {
-      color(),
-      fl_color_average(color(), FL_WHITE, 0.7f),
-      fl_color_average(color(), FL_BLACK, 0.6f),
-      fl_color_average(color(), FL_BLACK, 0.8f),
-    };
-    int i;
-    for (i=dx; i<12; i++) {
-      fl_color(c[i&3]);
-      fl_line(x1--, y1, x2, y2--);
-    }
-  }
-#endif
-
-# if defined(FLTK_USE_CAIRO)
-  Fl::cairo_make_current(this); // checkout if an update is necessary
-# endif
-}
-
 void Fl_Window::label(const char *name) {
   label(name, iconlabel());	// platform dependent
 }
 
+/** Sets the window titlebar label to a copy of a character string */
 void Fl_Window::copy_label(const char *a) {
   Fl_Widget::copy_label(a);
   label(label(), iconlabel());	// platform dependent
@@ -392,6 +373,9 @@ void Fl_Window::icon(const void * ic) {
   icon_->legacy_icon = ic;
 }
 
+/** Deletes all icons previously attached to the window.
+ \see Fl_Window::icons(const Fl_RGB_Image *icons[], int count)
+ */
 void Fl_Window::free_icons() {
   int i;
 
@@ -417,6 +401,58 @@ void Fl_Window::free_icons() {
 #endif
 }
 
+/**
+  Waits for the window to be fully displayed after calling show().
+
+  Fl_Window::show() is not guaranteed to show and draw the window on
+  all platforms immediately. Instead this is done in the background;
+  particularly on X11 this will take a few messages (client server
+  roundtrips) to display the window.
+
+  Usually this small delay doesn't matter, but in some cases you may
+  want to have the window instantiated and displayed synchronously.
+
+  Currently (as of FLTK 1.3.3) this method only has an effect on X11.
+  On Windows and Mac OS X show() is always synchronous. If you want to
+  write portable code and need this synchronous show() feature, add
+  win->wait_for_expose() on all platforms, FLTK will just do the
+  right thing.
+
+  This method can be used for displaying splash screens before
+  calling Fl::run() or for having exact control over which window
+  has focus after calling show().
+
+  If the window is not shown(), this method does nothing.
+
+  \see virtual void Fl_Window::show()
+
+  Example code for displaying a window before calling Fl::run()
+
+  \code
+    Fl_Double_Window win = new Fl_Double_Window(...);
+
+    // do more window initialization here ...
+
+    win->show();			// show window
+    win->wait_for_expose();		// wait, until displayed
+    Fl::flush();			// make sure everything gets drawn
+
+    // do more initialization work that needs some time here ...
+
+    Fl::run();				// start FLTK event loop
+  \endcode
+
+  Note that the window will not be responsive until the event loop
+  is started with Fl::run().
+*/
+
+void Fl_Window::wait_for_expose() {
+  if (!shown()) return;
+  while (!i || i->wait_for_expose) {
+    Fl::wait();
+  }
+}
+
 //
-// End of "$Id: Fl_Window.cxx 10197 2014-06-16 11:39:32Z ossman $".
+// End of "$Id: Fl_Window.cxx 10405 2014-10-29 15:53:52Z manolo $".
 //

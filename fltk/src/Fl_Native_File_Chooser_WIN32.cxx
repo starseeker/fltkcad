@@ -1,4 +1,4 @@
-// "$Id: Fl_Native_File_Chooser_WIN32.cxx 10216 2014-07-01 01:43:33Z greg.ercolano $"
+// "$Id: Fl_Native_File_Chooser_WIN32.cxx 10312 2014-09-15 09:35:05Z ossman $"
 //
 // FLTK native OS file chooser widget
 //
@@ -34,13 +34,12 @@ LPCWSTR utf8towchar(const char *in); //MG
 char *wchartoutf8(LPCWSTR in);  //MG
 
 #include <FL/Fl_Native_File_Chooser.H>
+#include <FL/x.H>
 
 #define LCURLY_CHR	'{'
 #define RCURLY_CHR	'}'
 #define LBRACKET_CHR	'['
 #define RBRACKET_CHR	']'
-
-void fl_OleInitialize();	// in Fl.cxx (Windows only)
 
 // STATIC: PRINT WINDOWS 'DOUBLE NULL' STRING (DEBUG)
 #ifdef DEBUG
@@ -465,7 +464,7 @@ int CALLBACK Fl_Native_File_Chooser::Dir_CB(HWND win, UINT msg, LPARAM param, LP
 // SHOW DIRECTORY BROWSER
 int Fl_Native_File_Chooser::showdir() {
   // initialize OLE only once
-  fl_OleInitialize();		// init needed by BIF_USENEWUI
+  fl_open_display();		// init needed by BIF_USENEWUI
   ClearBINF();
   clear_pathnames();
   // PARENT WINDOW
@@ -662,19 +661,6 @@ void Fl_Native_File_Chooser::add_filter(const char *name_in,	// name of filter (
   dnullcat(_parsedfilt, winfilter);
   _nfilters++;
   //DEBUG printf("DEBUG: ADD FILTER name=<%s> winfilter=<%s>\n", name, winfilter);
-}
-
-// COUNT OCCURRENCES OF ANY CHARS FROM 'find' IN 's'.
-static int strcnt(const char *s, const char *find) {
-  int cnt = 0;
-  const char *f;
-  while ( *s ) {
-    for (f=find; *f; f++) {
-      if (*s == *f) { ++cnt; break; }
-    }
-    ++s;
-  }
-  return cnt;
 }
 
 // RETURN HOW MANY DIFFERENT FILTERS WERE SPECIFIED
@@ -950,5 +936,5 @@ LPCWSTR utf8towchar(const char *in)
 #endif /*!FL_DOXYGEN*/
 
 //
-// End of "$Id: Fl_Native_File_Chooser_WIN32.cxx 10216 2014-07-01 01:43:33Z greg.ercolano $".
+// End of "$Id: Fl_Native_File_Chooser_WIN32.cxx 10312 2014-09-15 09:35:05Z ossman $".
 //

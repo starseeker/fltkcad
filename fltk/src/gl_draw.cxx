@@ -1,5 +1,5 @@
 //
-// "$Id: gl_draw.cxx 10061 2014-01-15 21:47:37Z manolo $"
+// "$Id: gl_draw.cxx 10414 2014-10-30 09:18:45Z cand $"
 //
 // OpenGL drawing support routines for the Fast Light Tool Kit (FLTK).
 //
@@ -24,6 +24,7 @@
 
 #include <FL/Fl.H>
 #include <FL/gl.h>
+#include <FL/gl_draw.H>
 #include <FL/x.H>
 #include <FL/fl_draw.H>
 #include <FL/Fl_Device.H>
@@ -32,7 +33,7 @@
 #include <FL/fl_utf8.h>
 
 #if !defined(WIN32) && !defined(__APPLE__)
-#include <FL/Xutf8.h>
+#include "Xutf8.h"
 #endif
 
 #if USE_XFT
@@ -569,5 +570,5 @@ void gl_texture_reset()
 #endif // HAVE_GL
 
 //
-// End of "$Id: gl_draw.cxx 10061 2014-01-15 21:47:37Z manolo $".
+// End of "$Id: gl_draw.cxx 10414 2014-10-30 09:18:45Z cand $".
 //

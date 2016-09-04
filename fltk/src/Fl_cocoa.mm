@@ -1,9 +1,9 @@
 //
-// "$Id: Fl_cocoa.mm 10210 2014-06-26 19:31:38Z manolo $"
+// "$Id: Fl_cocoa.mm 10427 2014-11-02 21:06:07Z manolo $"
 //
 // MacOS-Cocoa specific code for the Fast Light Tool Kit (FLTK).
 //
-// Copyright 1998-2013 by Bill Spitzak and others.
+// Copyright 1998-2014 by Bill Spitzak and others.
 //
 // This library is free software. Distribution and use rights are outlined in
 // the file "COPYING" which should have been included with this file.  If this
@@ -51,6 +51,7 @@ extern "C" {
 #include <stdarg.h>
 #include <math.h>
 #include <limits.h>
+#include <dlfcn.h>
 
 #import <Cocoa/Cocoa.h>
 
@@ -80,6 +81,7 @@ typedef unsigned int NSUInteger;
 // external functions
 extern void fl_fix_focus();
 extern unsigned short *fl_compute_macKeyLookUp();
+extern int fl_send_system_handlers(void *e);
 
 // forward definition of functions in this file
 // converting cr lf converter function
@@ -90,6 +92,7 @@ static void cocoaMouseHandler(NSEvent *theEvent);
 static int calc_mac_os_version();
 static void clipboard_check(void);
 static NSString *calc_utf8_format(void);
+static void im_update(void);
 static unsigned make_current_counts = 0; // if > 0, then Fl_Window::make_current() can be called only once
 static Fl_X *fl_x_to_redraw = NULL; // set by Fl_X::flush() to the Fl_X object of the window to be redrawn
 
@@ -114,6 +117,7 @@ static int main_screen_height; // height of menubar-containing screen used to co
 // through_drawRect = YES means the drawRect: message was sent to the view, 
 // thus the graphics context was prepared by the system
 static BOOL through_drawRect = NO; 
+static int im_enabled = -1;
 
 #if CONSOLIDATE_MOTION
 static Fl_Window* send_motion;
@@ -121,6 +125,29 @@ extern Fl_Window* fl_xmousewin;
 #endif
 
 enum { FLTKTimerEvent = 1, FLTKDataReadyEvent };
+
+// Carbon functions and definitions
+
+typedef void *TSMDocumentID;
+
+extern "C" enum {
+ kTSMDocumentEnabledInputSourcesPropertyTag = 'enis' //  from Carbon/TextServices.h
+};
+
+// Undocumented voodoo. Taken from Mozilla.
+static const int smEnableRomanKybdsOnly = -23;
+
+typedef TSMDocumentID (*TSMGetActiveDocument_type)(void);
+static TSMGetActiveDocument_type TSMGetActiveDocument;
+typedef OSStatus (*TSMSetDocumentProperty_type)(TSMDocumentID, OSType, UInt32, void*);
+static TSMSetDocumentProperty_type TSMSetDocumentProperty;
+typedef OSStatus (*TSMRemoveDocumentProperty_type)(TSMDocumentID, OSType);
+static TSMRemoveDocumentProperty_type TSMRemoveDocumentProperty;
+typedef CFArrayRef (*TISCreateASCIICapableInputSourceList_type)(void);
+static TISCreateASCIICapableInputSourceList_type TISCreateASCIICapableInputSourceList;
+
+typedef void (*KeyScript_type)(short);
+static KeyScript_type KeyScript;
 
 
 /* fltk-utf8 placekeepers */
@@ -639,9 +666,28 @@ void Fl::remove_timeout(Fl_Timeout_Handler cb, void* data)
  */
 - (BOOL)containsGLsubwindow;
 - (void)containsGLsubwindow:(BOOL)contains;
+#if MAC_OS_X_VERSION_MAX_ALLOWED >= MAC_OS_X_VERSION_10_7
+- (NSPoint)convertBaseToScreen:(NSPoint)aPoint;
+#endif
 @end
 
 @implementation FLWindow
+#if MAC_OS_X_VERSION_MAX_ALLOWED >= MAC_OS_X_VERSION_10_7
+- (NSPoint)convertBaseToScreen:(NSPoint)aPoint
+{
+  if (fl_mac_os_version >= 100700) {
+    NSRect r = [self convertRectToScreen:NSMakeRect(aPoint.x, aPoint.y, 0, 0)];
+    return r.origin;
+    }
+  else {
+    // replaces return [super convertBaseToScreen:aPoint] that may trigger a compiler warning
+    typedef NSPoint (*convertIMP)(id, SEL, NSPoint);
+    convertIMP addr = (convertIMP)[NSWindow instanceMethodForSelector:@selector(convertBaseToScreen:)];
+    return addr(self, @selector(convertBaseToScreen:), aPoint);
+    }
+}
+#endif
+
 - (FLWindow*)initWithFl_W:(Fl_Window *)flw 
 	      contentRect:(NSRect)rect 
 		styleMask:(NSUInteger)windowStyle 
@@ -1201,10 +1247,12 @@ static void cocoaMouseHandler(NSEvent *theEvent)
 #endif
 {
   void (*open_cb)(const char*);
+  TSMDocumentID currentDoc;
 }
 - (NSApplicationTerminateReply)applicationShouldTerminate:(NSApplication*)sender;
 - (void)applicationDidBecomeActive:(NSNotification *)notify;
 - (void)applicationDidChangeScreenParameters:(NSNotification *)aNotification;
+- (void)applicationDidUpdate:(NSNotification *)aNotification;
 - (void)applicationWillResignActive:(NSNotification *)notify;
 - (void)applicationWillHide:(NSNotification *)notify;
 - (void)applicationWillUnhide:(NSNotification *)notify;
@@ -1261,6 +1309,23 @@ static void cocoaMouseHandler(NSEvent *theEvent)
     }
   Fl::handle(FL_SCREEN_CONFIGURATION_CHANGED, NULL);
   fl_unlock_function();
+}
+- (void)applicationDidUpdate:(NSNotification *)aNotification
+{
+  if ((fl_mac_os_version >= 100500) && (im_enabled != -1) &&
+      (TSMGetActiveDocument != NULL)) {
+    TSMDocumentID newDoc;
+    // It is extremely unclear when Cocoa decides to create/update
+    // the input context, but debugging reveals that it is done
+    // by NSApplication:updateWindows. So check if the input context
+    // has shifted after each such run so that we can update our
+    // input methods status.
+    newDoc = TSMGetActiveDocument();
+    if (newDoc != currentDoc) {
+        im_update();
+        currentDoc = newDoc;
+    }
+  }
 }
 - (void)applicationWillResignActive:(NSNotification *)notify
 {
@@ -1349,12 +1414,15 @@ static void cocoaMouseHandler(NSEvent *theEvent)
  */
 void fl_open_callback(void (*cb)(const char *)) {
   fl_open_display();
-  [[NSApp delegate] open_cb:cb];
+  [(FLAppDelegate*)[NSApp delegate] open_cb:cb];
 }
 
 @implementation FLApplication
 + (void)sendEvent:(NSEvent *)theEvent
 {
+  if (fl_send_system_handlers(theEvent))
+    return;
+
   NSEventType type = [theEvent type];  
   if (type == NSLeftMouseDown) {
     fl_lock_function();
@@ -1396,12 +1464,19 @@ void fl_open_display() {
   static char beenHereDoneThat = 0;
   if ( !beenHereDoneThat ) {
     beenHereDoneThat = 1;
+
+    TSMGetActiveDocument = (TSMGetActiveDocument_type)Fl_X::get_carbon_function("TSMGetActiveDocument");
+    TSMSetDocumentProperty = (TSMSetDocumentProperty_type)Fl_X::get_carbon_function("TSMSetDocumentProperty");
+    TSMRemoveDocumentProperty = (TSMRemoveDocumentProperty_type)Fl_X::get_carbon_function("TSMRemoveDocumentProperty");
+    TISCreateASCIICapableInputSourceList = (TISCreateASCIICapableInputSourceList_type)Fl_X::get_carbon_function("TISCreateASCIICapableInputSourceList");
+
+    KeyScript = (KeyScript_type)Fl_X::get_carbon_function("KeyScript");
     
     BOOL need_new_nsapp = (NSApp == nil);
     if (need_new_nsapp) [NSApplication sharedApplication];
     NSAutoreleasePool *localPool;
     localPool = [[NSAutoreleasePool alloc] init]; // never released
-    [NSApp setDelegate:[[FLAppDelegate alloc] init]];
+    [(NSApplication*)NSApp setDelegate:[[FLAppDelegate alloc] init]];
     if (need_new_nsapp) [NSApp finishLaunching];
 
     // empty the event queue but keep system events for drag&drop of files at launch
@@ -1413,29 +1488,42 @@ void fl_open_display() {
     while (ign_event);
     
     // bring the application into foreground without a 'CARB' resource
-    Boolean same_psn;
-    ProcessSerialNumber cur_psn, front_psn;
-    if ( !GetCurrentProcess( &cur_psn ) && !GetFrontProcess( &front_psn ) &&
-         !SameProcess( &front_psn, &cur_psn, &same_psn ) && !same_psn ) {
+    bool i_am_in_front;
+    ProcessSerialNumber cur_psn = { 0, kCurrentProcess };
+#if MAC_OS_X_VERSION_MAX_ALLOWED >= MAC_OS_X_VERSION_10_6
+    if (fl_mac_os_version >= 100600) {
+      i_am_in_front = [[NSRunningApplication currentApplication] isActive];
+    }
+    else
+#endif
+    {
+      Boolean same_psn;
+      ProcessSerialNumber front_psn;
+      //avoid compilation warnings triggered by GetFrontProcess() and SameProcess()
+      void* h = dlopen(NULL, RTLD_LAZY);
+      typedef OSErr (*GetFrontProcess_type)(ProcessSerialNumber*);
+      GetFrontProcess_type  GetFrontProcess_ = (GetFrontProcess_type)dlsym(h, "GetFrontProcess");
+      typedef OSErr (*SameProcess_type)(ProcessSerialNumber*, ProcessSerialNumber*, Boolean*);
+      SameProcess_type  SameProcess_ = (SameProcess_type)dlsym(h, "SameProcess");
+      i_am_in_front = (!GetFrontProcess_( &front_psn ) &&
+                       !SameProcess_( &front_psn, &cur_psn, &same_psn ) && same_psn );
+    }
+    if (!i_am_in_front) {
       // only transform the application type for unbundled apps
       NSBundle *bundle = [NSBundle mainBundle];
       if (bundle) {
-	NSString *exe = [[bundle executablePath] stringByStandardizingPath];
-	NSString *bpath = [bundle bundlePath];
-	NSString *exe_dir = [exe stringByDeletingLastPathComponent];
-	if ([bpath isEqualToString:exe] || [bpath isEqualToString:exe_dir]) bundle = nil;
-	}
-            
-      if ( !bundle )
-      {
-        OSErr err;
-	err = TransformProcessType(&cur_psn, kProcessTransformToForegroundApplication); // needs Mac OS 10.3
-	/* support of Mac OS 10.2 or earlier used this undocumented call instead
-	 err = CPSEnableForegroundOperation(&cur_psn, 0x03, 0x3C, 0x2C, 0x1103);
-	*/
-        if (err == noErr) {
-          SetFrontProcess( &cur_psn );
-        }
+        NSString *exe = [[bundle executablePath] stringByStandardizingPath];
+        NSString *bpath = [bundle bundlePath];
+        NSString *exe_dir = [exe stringByDeletingLastPathComponent];
+        if ([bpath isEqualToString:exe] || [bpath isEqualToString:exe_dir]) bundle = nil;
+      }
+      
+      if ( !bundle ) {
+        TransformProcessType(&cur_psn, kProcessTransformToForegroundApplication); // needs Mac OS 10.3
+        /* support of Mac OS 10.2 or earlier used this undocumented call instead
+         err = CPSEnableForegroundOperation(&cur_psn, 0x03, 0x3C, 0x2C, 0x1103);
+         */
+        [NSApp activateIgnoringOtherApps:YES];
       }
     }
     if (![NSApp servicesMenu]) createAppleMenu();
@@ -1455,6 +1543,66 @@ void fl_open_display() {
  * get rid of allocated resources
  */
 void fl_close_display() {
+}
+
+// Force a "Roman" or "ASCII" keyboard, which both the Mozilla and
+// Safari people seem to think implies turning off advanced IME stuff
+// (see nsTSMManager::SyncKeyScript in Mozilla and enableSecureTextInput
+// in Safari/Webcore). Should be good enough for us then...
+
+static void im_update(void) {
+  if (fl_mac_os_version >= 100500) {
+    TSMDocumentID doc;
+
+    if ((TSMGetActiveDocument == NULL) ||
+        (TSMSetDocumentProperty == NULL) ||
+        (TSMRemoveDocumentProperty == NULL) ||
+        (TISCreateASCIICapableInputSourceList == NULL))
+      return;
+
+    doc = TSMGetActiveDocument();
+
+    if (im_enabled)
+      TSMRemoveDocumentProperty(doc, kTSMDocumentEnabledInputSourcesPropertyTag);
+    else {
+      CFArrayRef inputSources;
+
+      inputSources = TISCreateASCIICapableInputSourceList();
+      TSMSetDocumentProperty(doc, kTSMDocumentEnabledInputSourcesPropertyTag,
+                             sizeof(CFArrayRef), &inputSources);
+      CFRelease(inputSources);
+    }
+  } else {
+    if (KeyScript == NULL)
+      return;
+
+    if (im_enabled)
+      KeyScript(smKeyEnableKybds);
+    else
+      KeyScript(smEnableRomanKybdsOnly);
+  }
+}
+
+void Fl::enable_im() {
+  fl_open_display();
+
+  im_enabled = 1;
+
+  if (fl_mac_os_version >= 100500)
+    [NSApp updateWindows];
+  else
+    im_update();
+}
+
+void Fl::disable_im() {
+  fl_open_display();
+
+  im_enabled = 0;
+
+  if (fl_mac_os_version >= 100500)
+    [NSApp updateWindows];
+  else
+    im_update();
 }
 
 
@@ -1922,6 +2070,7 @@ static void cocoaKeyboardHandler(NSEvent *theEvent)
 - (void)resetCursorRects {
   Fl_Window *w = [(FLWindow*)[self window] getFl_Window];
   Fl_X *i = Fl_X::i(w);
+  if (!i) return;  // fix for STR #3128
   // We have to have at least one cursor rect for invalidateCursorRectsForView
   // to work, hence the "else" clause.
   if (i->cursor)
@@ -2303,7 +2452,7 @@ static void cocoaKeyboardHandler(NSEvent *theEvent)
   }
   // Convert the rect to screen coordinates
   glyphRect.origin.y = wfocus->h() - glyphRect.origin.y;
-  glyphRect.origin = [[self window] convertBaseToScreen:glyphRect.origin];
+  glyphRect.origin = [(FLWindow*)[self window] convertBaseToScreen:glyphRect.origin];
   if (actualRange) *actualRange = aRange;
   fl_unlock_function();
   return glyphRect;
@@ -2361,6 +2510,7 @@ void Fl_X::flush()
   fl_x_to_redraw = NULL;
 }
 
+//bool Fl_X::make_shaped = false;
 
 /*
  * go ahead, create that (sub)window
@@ -2517,6 +2667,10 @@ void Fl_X::make(Fl_Window* w)
     [cw setFrameOrigin:crect.origin];
     [cw setHasShadow:YES];
     [cw setAcceptsMouseMovedEvents:YES];
+    if (w->shape_data_) {
+      [cw setOpaque:NO]; // shaped windows must be non opaque
+      [cw setBackgroundColor:[NSColor clearColor]]; // and with transparent background color
+      }
     x->xid = cw;
     x->w = w; w->i = x;
     x->wait_for_expose = 1;
@@ -2545,8 +2699,7 @@ void Fl_X::make(Fl_Window* w)
     [myview registerForDraggedTypes:[NSArray arrayWithObjects:utf8_format,  NSFilenamesPboardType, nil]];
     if ( ! Fl_X::first->next ) {	
       // if this is the first window, we need to bring the application to the front
-      ProcessSerialNumber psn = { 0, kCurrentProcess };
-      SetFrontProcess( &psn );
+      [NSApp activateIgnoringOtherApps:YES];
     }
     
     if (w->size_range_set) w->size_range_();
@@ -2645,7 +2798,7 @@ void Fl_Window::show() {
     labeltype(FL_NO_LABEL);
   }
   Fl_Tooltip::exit(this);
-  if (!shown() || !i) {
+  if (!shown()) {
     Fl_X::make(this);
   } else {
     if ( !parent() ) {
@@ -3699,19 +3852,33 @@ unsigned char *Fl_X::bitmap_from_window_rect(Fl_Window *win, int x, int y, int w
   *bytesPerPixel = [bitmap bitsPerPixel]/8;
   int bpp = (int)[bitmap bytesPerPlane];
   int bpr = (int)[bitmap bytesPerRow];
-  int hh = bpp/bpr; // sometimes hh = h-1 for unclear reason
-  int ww = bpr/(*bytesPerPixel); // sometimes ww = w-1
-  unsigned char *data = new unsigned char[w * h *  *bytesPerPixel];
-  if (w == ww) {
-    memcpy(data, [bitmap bitmapData], w * hh *  *bytesPerPixel);
-  } else {
-    unsigned char *p = [bitmap bitmapData];
-    unsigned char *q = data;
-    for(int i = 0;i < hh; i++) {
-      memcpy(q, p, *bytesPerPixel * ww);
-      p += bpr;
-      q += w * *bytesPerPixel;
+  int hh = bpp/bpr; // sometimes hh = h-1 for unclear reason, and hh = 2*h with retina
+  int ww = bpr/(*bytesPerPixel); // sometimes ww = w-1, and ww = 2*w with retina
+  unsigned char *data;
+  if (ww > w) { // with a retina display
+    Fl_RGB_Image *rgb = new Fl_RGB_Image([bitmap bitmapData], ww, hh, 4);
+    Fl_RGB_Scaling save_scaling = Fl_Image::RGB_scaling();
+    Fl_Image::RGB_scaling(FL_RGB_SCALING_BILINEAR);
+    Fl_RGB_Image *rgb2 = (Fl_RGB_Image*)rgb->copy(w, h);
+    Fl_Image::RGB_scaling(save_scaling);
+    delete rgb;
+    rgb2->alloc_array = 0;
+    data = (uchar*)rgb2->array;
+    delete rgb2;
+  }
+  else {
+    data = new unsigned char[w * h *  *bytesPerPixel];
+    if (w == ww) {
+      memcpy(data, [bitmap bitmapData], w * hh *  *bytesPerPixel);
+    } else {
+      unsigned char *p = [bitmap bitmapData];
+      unsigned char *q = data;
+      for(int i = 0;i < hh; i++) {
+        memcpy(q, p, *bytesPerPixel * ww);
+        p += bpr;
+        q += w * *bytesPerPixel;
       }
+    }
   }
   return data;
 }
@@ -3752,7 +3919,7 @@ WindowRef Fl_X::window_ref()
 
 // so a CGRect matches exactly what is denoted x,y,w,h for clipping purposes
 CGRect fl_cgrectmake_cocoa(int x, int y, int w, int h) {
-  return CGRectMake(x, y, w > 0 ? w - 0.9 : 0, h > 0 ? h - 0.9 : 0);
+  return CGRectMake(x - 0.5, y - 0.5, w, h);
 }
 
 Window fl_xid(const Fl_Window* w)
@@ -3779,6 +3946,7 @@ int Fl_Window::decorated_h()
 
 void Fl_Paged_Device::print_window(Fl_Window *win, int x_offset, int y_offset)
 {
+  NSButton *close = nil, *miniaturize = nil, *zoom = nil;
   if (!win->shown() || win->parent() || !win->border() || !win->visible()) {
     this->print_widget(win, x_offset, y_offset);
     return;
@@ -3789,21 +3957,70 @@ void Fl_Paged_Device::print_window(Fl_Window *win, int x_offset, int y_offset)
   const char *title = win->label();
   win->label(""); // temporarily set a void window title
   win->show();
+  if (fl_mac_os_version >= 101000) {
+    // if linked for OS 10.10, capture of title bar does not capture the title bar buttons
+    // so we draw them in FLTK
+    NSWindow *xid = fl_xid(win);
+    close = [xid standardWindowButton:NSWindowCloseButton]; // 10.2
+    miniaturize = [xid standardWindowButton:NSWindowMiniaturizeButton];
+    zoom = [xid standardWindowButton:NSWindowZoomButton];
+    [close setHidden:YES]; // 10.3
+    [miniaturize setHidden:YES];
+    [zoom setHidden:YES];
+  }
   fl_gc = NULL;
   Fl::check();
+  BOOL to_quartz = dynamic_cast<Fl_Printer*>(this) != NULL;
   // capture the window title bar with no title
-  unsigned char *bitmap = Fl_X::bitmap_from_window_rect(win, 0, -bt, win->w(), bt, &bpp);
+  CGImageRef img = NULL;
+  unsigned char *bitmap = NULL;
+  if (to_quartz)
+    img = Fl_X::CGImage_from_window_rect(win, 0, -bt, win->w(), bt);
+  else
+    bitmap = Fl_X::bitmap_from_window_rect(win, 0, -bt, win->w(), bt, &bpp);
   win->label(title); // put back the window title
-  // and print it
   this->set_current(); // back to the Fl_Paged_Device
-  Fl_RGB_Image *rgb = new Fl_RGB_Image(bitmap, win->w(), bt, bpp);
-  rgb->draw(x_offset, y_offset);
-  delete rgb;
-  delete[] bitmap;
+  if (img && to_quartz) { // print the title bar
+    CGRect rect = { { x_offset, y_offset }, { win->w(), bt } };
+    Fl_X::q_begin_image(rect, 0, 0, win->w(), bt);
+    CGContextDrawImage(fl_gc, rect, img);
+    Fl_X::q_end_image();
+    CFRelease(img);
+  }
+  else if(!to_quartz) {
+    Fl_RGB_Image *rgb = new Fl_RGB_Image(bitmap, win->w(), bt, bpp);
+    rgb->draw(x_offset, y_offset);
+    delete rgb;
+    delete[] bitmap;
+  }
+  if (fl_mac_os_version >= 101000) { // print the title bar buttons
+    Fl_Color inactive = fl_rgb_color((uchar)0xCE, (uchar)0xCE, (uchar)0xCE); // inactive button color
+    Fl_Color redish, yellowish, greenish;
+    if ([[NSUserDefaults standardUserDefaults] integerForKey:@"AppleAquaColorVariant"] == 6) { // graphite appearance
+      redish = yellowish = greenish = fl_rgb_color((uchar)0x8C, (uchar)0x8C, (uchar)0x8C);
+    }
+    else {
+      redish = fl_rgb_color((uchar)0xFF, (uchar)0x63, (uchar)0x5A);
+      yellowish = fl_rgb_color((uchar)0xFF, (uchar)0xC6, (uchar)0x42);
+      greenish = fl_rgb_color((uchar)0x29, (uchar)0xD6, (uchar)0x52);
+    }
+    
+    if (![close isEnabled]) fl_color(inactive); else fl_color(redish);
+    fl_pie(x_offset+8, y_offset+5, 12, 12, 0, 360);
+    if (![miniaturize isEnabled]) fl_color(inactive); else fl_color(yellowish);
+    fl_pie(x_offset+28, y_offset+5, 12, 12, 0, 360);
+    if (![zoom isEnabled]) fl_color(inactive); else fl_color(greenish);
+    fl_pie(x_offset+48, y_offset+5, 12, 12, 0, 360);
+    
+    [close setHidden:NO]; // 10.3
+    [miniaturize setHidden:NO];
+    [zoom setHidden:NO];
+  }
   if (title) { // print the window title
-    const int skip = 68; // approx width of the zone of the 3 window control buttons
+    const int skip = 65; // approx width of the zone of the 3 window control buttons
 #if MAC_OS_X_VERSION_MAX_ALLOWED >= MAC_OS_X_VERSION_10_4
-    if (fl_mac_os_version >= 100400 && dynamic_cast<Fl_Printer*>(this)) { // use Cocoa string drawing with exact title bar font
+    if (fl_mac_os_version >= 100400 && to_quartz) { // use Cocoa string drawing with exact title bar font
+      // the exact font is LucidaGrande 13 pts (and HelveticaNeueDeskInterface-Regular with 10.10)
       NSGraphicsContext *current = [NSGraphicsContext currentContext];
       [NSGraphicsContext setCurrentContext:[NSGraphicsContext graphicsContextWithGraphicsPort:fl_gc flipped:YES]];//10.4
       NSDictionary *attr = [NSDictionary dictionaryWithObject:[NSFont titleBarFontOfSize:0] 
@@ -3821,7 +4038,7 @@ void Fl_Paged_Device::print_window(Fl_Window *win, int x_offset, int y_offset)
     else
 #endif
     {
-      fl_font(FL_HELVETICA, 14); // the exact font is LucidaGrande 13 pts
+      fl_font(FL_HELVETICA, 14);
       fl_color(FL_BLACK);
       int x = x_offset + win->w()/2 - fl_width(title)/2;
       if (x < x_offset+skip) x = x_offset+skip;
@@ -3833,7 +4050,6 @@ void Fl_Paged_Device::print_window(Fl_Window *win, int x_offset, int y_offset)
   this->print_widget(win, x_offset, y_offset + bt); // print the window inner part
 }
 
-#include <dlfcn.h>
 
 /* Returns the address of a Carbon function after dynamically loading the Carbon library if needed.
  Supports old Mac OS X versions that may use a couple of Carbon calls:
@@ -3858,9 +4074,20 @@ void *Fl_X::get_carbon_function(const char *function_name) {
 static int calc_mac_os_version() {
   int M, m, b = 0;
   NSAutoreleasePool *localPool = [[NSAutoreleasePool alloc] init];
-  NSDictionary * sv = [NSDictionary dictionaryWithContentsOfFile:@"/System/Library/CoreServices/SystemVersion.plist"];
-  const char *s = [[sv objectForKey:@"ProductVersion"] UTF8String];
-  sscanf(s, "%d.%d.%d", &M, &m, &b);
+#if MAC_OS_X_VERSION_MAX_ALLOWED >= MAC_OS_X_VERSION_10_10
+  if ([NSProcessInfo instancesRespondToSelector:@selector(operatingSystemVersion)]) {
+    NSOperatingSystemVersion version = [[NSProcessInfo processInfo] operatingSystemVersion];
+    M = version.majorVersion;
+    m = version.minorVersion;
+    b = version.patchVersion;
+  }
+  else
+#endif
+  {
+    NSDictionary * sv = [NSDictionary dictionaryWithContentsOfFile:@"/System/Library/CoreServices/SystemVersion.plist"];
+    const char *s = [[sv objectForKey:@"ProductVersion"] UTF8String];
+    sscanf(s, "%d.%d.%d", &M, &m, &b);
+  }
   [localPool release];
   return M*10000 + m*100 + b;
 }
@@ -3868,5 +4095,5 @@ static int calc_mac_os_version() {
 #endif // __APPLE__
 
 //
-// End of "$Id: Fl_cocoa.mm 10210 2014-06-26 19:31:38Z manolo $".
+// End of "$Id: Fl_cocoa.mm 10427 2014-11-02 21:06:07Z manolo $".
 //
